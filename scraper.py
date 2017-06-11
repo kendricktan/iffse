@@ -2,6 +2,7 @@
 " Scraps instagram username and their respective images
 " into a sqlite3 database
 """
+import logging
 import sys
 import os
 import time
@@ -28,7 +29,13 @@ insta_pwd = os.environ.get('insta_pwd', '')
 insta_api = InstagramAPI(insta_usr, insta_pwd)
 insta_api.login()
 
-user_id = insta_api.username_id
+# Logging
+global_logger = logging.getLogger('scraper')
+hdlr = logging.FileHandler('./scrap_errors.log')
+formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+hdlr.setFormatter(formatter)
+global_logger.addHandler(hdlr)
+global_logger.setLevel(logging.WARNING)
 
 
 def user_scrapped(user_id):
@@ -132,28 +139,37 @@ def recursively_scrap_user_followings(user_id):
     followings = get_user_followings(user_id)
 
     for idx, (c_user_id, c_username) in enumerate(tqdm(followings, desc=username)):
-        if user_scrapped(c_user_id):
-            break
-
-        user_db = add_user(c_user_id, c_username)
-
-        # Iterate through users feed
-        feed_max_id = ''
-        for _ in tqdm(range(10)):
-            insta_api.getUserFeed(c_user_id, feed_max_id)
-            feed_max_id = insta_api.LastJson.get('next_max_id', '')
-            user_imgs = insta_api.LastJson['items']
-
-            img_urls = get_user_image_urls(user_imgs)
-            for url in img_urls:
-                add_user_image(url, user_db)
-
-            if not feed_max_id:
+        try:
+            if user_scrapped(c_user_id):
                 break
 
-        time.sleep(random.randint(3, 10))
-        recursively_scrap_user_followings(c_user_id)
+            user_db = add_user(c_user_id, c_username)
+
+            # Iterate through users feed
+            feed_max_id = ''
+            for _ in tqdm(range(10)):
+                insta_api.getUserFeed(c_user_id, feed_max_id)
+                feed_max_id = insta_api.LastJson.get('next_max_id', '')
+                user_imgs = insta_api.LastJson['items']
+
+                img_urls = get_user_image_urls(user_imgs)
+                for url in img_urls:
+                    add_user_image(url, user_db)
+
+                if not feed_max_id:
+                    break
+
+            time.sleep(random.randint(3, 10))
+
+        except Exception as e:
+            global_logger.error(str(e))
+
+    for idx, (c_user_id, c_username) in enumerate(followings):
+        try:
+            recursively_scrap_user_followings(c_user_id)
+        except Exception as e:
+            global_logger.error(str(e))
 
 
 if __name__ == '__main__':
-    recursively_scrap_user_followings(user_id)
+    recursively_scrap_user_followings(insta_api.username_id)
