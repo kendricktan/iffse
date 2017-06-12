@@ -142,7 +142,7 @@ def recursively_scrap_user_followings(user_id):
     for idx, (c_user_id, c_username) in enumerate(tqdm(followings, desc='{} followings'.format(username))):
         try:
             if user_scrapped(c_user_id):
-                break
+                continue
 
             user_db = add_user(c_user_id, c_username)
 
