@@ -166,6 +166,9 @@ def recursively_scrap_user_followings(user_id):
                     # Sleeps for 0 - 2.5 seconds randomly
                     time.sleep(random.random() * 2.5)
 
+                else:
+                    break
+
             # Sleeps for 3-5 seconds
             time.sleep(random.randint(3, 5))
 
