@@ -4,9 +4,10 @@ import requests
 from tqdm import tqdm
 from PIL import Image
 from io import BytesIO
-from database import Base, User, UserImage
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+
+from facemaps.data.database import Base, User, UserImage
 
 # Database globals
 engine = create_engine('sqlite:///instagram_users.db')

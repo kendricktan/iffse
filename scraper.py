@@ -9,11 +9,11 @@ import time
 import random
 
 from facemaps.insta_scraper import InstagramAPI
+from facemaps.data.database import Base, User, UserImage
 from tqdm import tqdm
 from datetime import datetime
 from pprint import pprint
 
-from database import Base, User, UserImage
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -138,7 +138,8 @@ def recursively_scrap_user_followings(user_id):
     username = insta_api.LastJson['user']['username']
     followings = get_user_followings(user_id)
 
-    for idx, (c_user_id, c_username) in enumerate(tqdm(followings, desc=username)):
+    max_idx = len(followings)
+    for idx, (c_user_id, c_username) in enumerate(tqdm(followings, desc='{} followings'.format(username))):
         try:
             if user_scrapped(c_user_id):
                 break
@@ -147,19 +148,26 @@ def recursively_scrap_user_followings(user_id):
 
             # Iterate through users feed
             feed_max_id = ''
-            for _ in tqdm(range(10)):
+            for _ in tqdm(range(10), desc='{} [{}/{}]'.format(c_username, idx, max_idx)):
                 insta_api.getUserFeed(c_user_id, feed_max_id)
                 feed_max_id = insta_api.LastJson.get('next_max_id', '')
-                user_imgs = insta_api.LastJson['items']
 
-                img_urls = get_user_image_urls(user_imgs)
-                for url in img_urls:
-                    add_user_image(url, user_db)
+                # If no items then its a private user
+                if 'items' in insta_api.LastJson:
+                    user_imgs = insta_api.LastJson['items']
 
-                if not feed_max_id:
-                    break
+                    img_urls = get_user_image_urls(user_imgs)
+                    for url in img_urls:
+                        add_user_image(url, user_db)
 
-            time.sleep(random.randint(3, 10))
+                    if not feed_max_id:
+                        break
+
+                    # Sleeps for 0 - 2.5 seconds randomly
+                    time.sleep(random.random() * 2.5)
+
+            # Sleeps for 3-5 seconds
+            time.sleep(random.randint(3, 5))
 
         except Exception as e:
             global_logger.error(str(e))
@@ -167,6 +175,7 @@ def recursively_scrap_user_followings(user_id):
     for idx, (c_user_id, c_username) in enumerate(followings):
         try:
             recursively_scrap_user_followings(c_user_id)
+            time.sleep(random.randint(3, 5))
         except Exception as e:
             global_logger.error(str(e))
 
