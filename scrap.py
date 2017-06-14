@@ -1,8 +1,43 @@
+"""
+Instagram selfie scraper, date: 2017/06/14
+Author: Kendrick Tan
+"""
 import json
 import re
 import requests
 
 from tqdm import tqdm
+
+
+def get_instagram_profile_page_query_id(en_Commons_url):
+    """
+    Given the en_US_Commons.js url, find the query
+    id from within for a profile page
+    """
+    r = requests.get(en_Commons_url)
+    query_id = re.findall(r'l="(\d+)",p="PROFILE_POSTS_UPDATED"', r.text)[0]
+
+    return query_id
+
+
+def get_instagram_feed_page_query_id(en_Commons_url):
+    """
+    Given the en_US_Commons.js url, find the query
+    id from within for a feed page
+    """
+    r = requests.get(en_Commons_url)
+    query_id = re.findall(r'c="(\d+)",l="TAG_MEDIA_UPDATED"', r.text)[0]
+
+    return query_id
+
+
+def get_instagram_us_common_js(text):
+    """
+    Given a Instagram HTML page, return the
+    en_US_Common.js thingo URL (contains the query_id)
+    """
+    js_file = re.findall(r"en_US_Commons.js/(\w+).js", text)[0]
+    return "https://www.instagram.com/static/bundles/en_US_Commons.js/{}.js".format(str(js_file))
 
 
 def get_instagram_shared_data(text):
@@ -27,15 +62,14 @@ def get_username_from_shortcode(shortcode):
     return username
 
 
-def get_instagram_profile_next_end_cursor(profile_id, end_cursor, keywords=['selfie']):
+def get_instagram_profile_next_end_cursor(query_id, profile_id, end_cursor, keywords=['selfie']):
     """
     Given the next endcursor, retrieve the list
     of profile pic URLS and if 'has_next_page'
     """
-    next_url = "https://www.instagram.com/graphql/query/" \
-               "?query_id=17880160963012870&id={}&first=12&after={}".format(
-                   profile_id, end_cursor
-               )
+    next_url = "https://www.instagram.com/graphql/query/?query_id={}&id={}&first=12&after={}".format(
+        query_id, profile_id, end_cursor)
+    # next_url = "https://www.instagram.com/graphql/query/?query_id=17880160963012870&id={}&first=12&after={}".format(profile_id, end_cursor)
 
     r = requests.get(next_url)
     r_json = json.loads(r.text)
@@ -63,7 +97,7 @@ def get_instagram_profile_next_end_cursor(profile_id, end_cursor, keywords=['sel
     return display_pictures, has_next_page, end_cursor
 
 
-def get_instagram_profile_display_pictures(username, profile_id, keywords=['selfie'], max_pics=12):
+def get_instagram_profile_display_pictures(username, profile_id, keywords=['selfie'], max_pics=3):
     """
     Given an instagram username, traverse their profile
     and scrap <num_pics> of their display pictures
@@ -82,6 +116,10 @@ def get_instagram_profile_display_pictures(username, profile_id, keywords=['self
     r = requests.get('https://www.instagram.com/{}/'.format(username))
     r_js = get_instagram_shared_data(r.text)
     media_json = r_js['entry_data']['ProfilePage'][0]['user']['media']
+
+    # Unique query id for each profile view
+    en_common_js_url = get_instagram_us_common_js(r.text)
+    query_id = get_instagram_profile_page_query_id(en_common_js_url)
 
     # Get the first 12 display pictures
     # Only add them to database if they have
@@ -104,7 +142,7 @@ def get_instagram_profile_display_pictures(username, profile_id, keywords=['self
     # 81 photos (12 initial + 60 traversed)
     while len(total_display_images) < max_pics:
         display_images, has_next_page, end_cursor \
-            = get_instagram_profile_next_end_cursor(profile_id, end_cursor)
+            = get_instagram_profile_next_end_cursor(query_id, profile_id, end_cursor)
         total_display_images.extend(display_images)
 
         tqdm.write('{}: {} pictures scrapped'.format(
@@ -116,13 +154,14 @@ def get_instagram_profile_display_pictures(username, profile_id, keywords=['self
     return total_display_images
 
 
-def get_instagram_hashtag_feed(has_next_page, end_cursor, tags='selfie'):
+def get_instagram_hashtag_feed(query_id, end_cursor, tags='selfie'):
     """
     Traverses through instagram's hashtag feed, using the
     graphql endpoint. query_id is hardcoded at facebook for some reason
     """
-    feed_url = 'https://www.instagram.com/graphql/query/?query_id=17882293912014529&' \
-               'tag_name={}&first=9&after={}'.format(tags, end_cursor)
+    feed_url = 'https://www.instagram.com/graphql/query/?query_id={}&' \
+               'tag_name={}&first=9&after={}'.format(
+                   query_id, tags, end_cursor)
 
     r = requests.get(feed_url)
     r_js = json.loads(r.text)
@@ -131,7 +170,7 @@ def get_instagram_hashtag_feed(has_next_page, end_cursor, tags='selfie'):
     page_info = r_js['data']['hashtag']['edge_hashtag_to_media']['page_info']
     has_next_page, end_cursor = page_info['has_next_page'], page_info['end_cursor']
 
-    edges = r_js['data']['hashtag']['edge_hashtag_to_top_posts']['edges']
+    edges = r_js['data']['hashtag']['edge_hashtag_to_media']['edges']
 
     usernames = []
     profile_ids = []
@@ -152,6 +191,11 @@ def instagram_hashtag_seed(tags='selfie'):
     r = requests.get('https://www.instagram.com/explore/tags/{}/'.format(tags))
     r_js = get_instagram_shared_data(r.text)
 
+    # To get the query id
+    en_common_js_url = get_instagram_us_common_js(r.text)
+    query_id = get_instagram_feed_page_query_id(en_common_js_url)
+
+    # Concat first 12 username and profile_ids here
     usernames = []
     profile_ids = []
 
@@ -169,11 +213,11 @@ def instagram_hashtag_seed(tags='selfie'):
     page_info = media_json['page_info']
     has_next_page, end_cursor = page_info['has_next_page'], page_info['end_cursor']
 
-    return list(zip(usernames, profile_ids)), has_next_page, end_cursor
+    return list(zip(usernames, profile_ids)), query_id, has_next_page, end_cursor
 
 
 if __name__ == '__main__':
-    lll, hnp, ec = instagram_hashtag_seed()
+    lll, qid, hnp, ec = instagram_hashtag_seed()
 
     dps = []
     for idx, (username, profile_id) in enumerate(tqdm(lll)):
