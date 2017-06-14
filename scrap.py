@@ -273,7 +273,13 @@ if __name__ == '__main__':
     for i in tqdm(range(10), desc='batch no.'):
         for username, profile_id, dps in p.imap_unordered(mp_instagram_profile_display_pictures, upl):
             if username is not None:
-                tqdm.write('[!] Done: {} [{}] <{} images>'.format(username, profile_id, len(dps)))
+                tqdm.write('[!] Done: {} [{}] <{} images>'.format(
+                    username, profile_id, len(dps))
+                )
+
+                user_dps[profile_id] = {}
+                user_dps[profile_id]['images'] = dps
+                user_dps[profile_id]['uesrname'] = username
 
         try:
             upl, hnp, ec = get_instagram_hashtag_feed(qid, ec)
@@ -282,7 +288,8 @@ if __name__ == '__main__':
             # Probably got rate limited by instagram?
             # Sleep for 5 minutes and resume
             # but refresh and get a new query id
-            tqdm.write('[X] Probably rate limited by instagram, pausing for a random amount of time...')
+            tqdm.write(
+                '[X] Probably rate limited by instagram, pausing for a random amount of time...')
             time.sleep(random.randint(300, 500))
 
             _, qid, _, _ = instagram_hashtag_seed()
