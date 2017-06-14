@@ -139,14 +139,17 @@ def get_instagram_profile_display_pictures(username, profile_id, keywords=['self
     has_next_page = media_json['page_info']['has_next_page']
 
     # Only want to scrap entire feed, just want
-    # 81 photos (12 initial + 60 traversed)
-    while len(total_display_images) < max_pics:
+    # to go through 81 photos (12 initial + 60 traversed)
+    i = 0
+    while len(total_display_images) < max_pics and i < 6:
         display_images, has_next_page, end_cursor \
             = get_instagram_profile_next_end_cursor(query_id, profile_id, end_cursor)
         total_display_images.extend(display_images)
 
         if not has_next_page:
             break
+
+        i = i + 1
 
     return total_display_images
 
