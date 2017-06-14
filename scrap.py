@@ -2,30 +2,47 @@
 Instagram selfie scraper, date: 2017/06/14
 Author: Kendrick Tan
 """
+import time
 import json
 import re
 import requests
+import random
 
 from tqdm import tqdm
+from multiprocessing import Pool
 
 
-def get_instagram_profile_page_query_id(en_Commons_url):
+def get_instagram_profile_page_query_id(en_commons_url):
     """
     Given the en_US_Commons.js url, find the query
     id from within for a profile page
+
+    Args:
+        en_commons_url: URL for the en_Commons_url.js
+                        (can be found by viewing instagram.com source)
+
+    Returns:
+        query_id needed to query graphql
     """
-    r = requests.get(en_Commons_url)
+    r = requests.get(en_commons_url)
     query_id = re.findall(r'l="(\d+)",p="PROFILE_POSTS_UPDATED"', r.text)[0]
 
     return query_id
 
 
-def get_instagram_feed_page_query_id(en_Commons_url):
+def get_instagram_feed_page_query_id(en_commons_url):
     """
     Given the en_US_Commons.js url, find the query
     id from within for a feed page
+
+    Args:
+        en_commons_url: URL for the en_Commons_url.js
+                        (can be found by viewing instagram.com source)
+
+    Returns:
+        query_id needed to query graphql
     """
-    r = requests.get(en_Commons_url)
+    r = requests.get(en_commons_url)
     query_id = re.findall(r'c="(\d+)",l="TAG_MEDIA_UPDATED"', r.text)[0]
 
     return query_id
@@ -35,6 +52,12 @@ def get_instagram_us_common_js(text):
     """
     Given a Instagram HTML page, return the
     en_US_Common.js thingo URL (contains the query_id)
+
+    Args:
+        text: Raw html source for instagram.com
+
+    Returns:
+        url to obtain us_commons_js
     """
     js_file = re.findall(r"en_US_Commons.js/(\w+).js", text)[0]
     return "https://www.instagram.com/static/bundles/en_US_Commons.js/{}.js".format(str(js_file))
@@ -44,6 +67,13 @@ def get_instagram_shared_data(text):
     """
     Given a Instagram HTML page, return the
     'shared_data' json object
+
+    Args:
+        text: Raw html source for instagram
+
+    Returns:
+        dict containing the json blob thats in
+        instagram.com
     """
     json_blob = re.findall(r"window._sharedData\s=\s(.+);</script>", text)[0]
     return json.loads(json_blob)
@@ -53,6 +83,12 @@ def get_username_from_shortcode(shortcode):
     """
     Given a shortcode (e.g. 'BUwTJMRgKKD'), try and
     find op's username (in order to get their profile page)
+
+    Args:
+        shortcode: instagram shortcode (BUTJMRgKKd)
+
+    Returns:
+        OP's username
     """
     shortcode_url = 'https://www.instagram.com/p/{}/'.format(shortcode)
 
@@ -69,7 +105,6 @@ def get_instagram_profile_next_end_cursor(query_id, profile_id, end_cursor, keyw
     """
     next_url = "https://www.instagram.com/graphql/query/?query_id={}&id={}&first=12&after={}".format(
         query_id, profile_id, end_cursor)
-    # next_url = "https://www.instagram.com/graphql/query/?query_id=17880160963012870&id={}&first=12&after={}".format(profile_id, end_cursor)
 
     r = requests.get(next_url)
     r_json = json.loads(r.text)
@@ -140,24 +175,33 @@ def get_instagram_profile_display_pictures(username, profile_id, keywords=['self
 
     # Only want to scrap entire feed, just want
     # to go through 81 photos (12 initial + 60 traversed)
-    i = 0
-    while len(total_display_images) < max_pics and i < 6:
+    for i in range(6):
         display_images, has_next_page, end_cursor \
             = get_instagram_profile_next_end_cursor(query_id, profile_id, end_cursor)
         total_display_images.extend(display_images)
 
-        if not has_next_page:
+        if not has_next_page or len(total_display_images) > max_pics:
             break
 
-        i = i + 1
+    return username, profile_id, total_display_images
 
-    return total_display_images
+
+def mp_instagram_profile_display_pictures(args):
+    """
+    Multiprocessing function for get_instagram_profile_display_pictures
+    """
+    username, profile_id = args
+
+    try:
+        return get_instagram_profile_display_pictures(username, profile_id)
+    except:
+        return None, None, None
 
 
 def get_instagram_hashtag_feed(query_id, end_cursor, tags='selfie'):
     """
     Traverses through instagram's hashtag feed, using the
-    graphql endpoint. query_id is hardcoded at facebook for some reason
+    graphql endpoint
     """
     feed_url = 'https://www.instagram.com/graphql/query/?query_id={}&' \
                'tag_name={}&first=9&after={}'.format(
@@ -217,22 +261,34 @@ def instagram_hashtag_seed(tags='selfie'):
 
 
 if __name__ == '__main__':
-    lll, qid, hnp, ec = instagram_hashtag_seed()
+    p = Pool()
 
     user_dps = {}
-    for i in tqdm(range(10)):
-        for idx, (username, profile_id) in enumerate(tqdm(lll, desc='batch: {}'.format(i))):
-            try:
-                dps = get_instagram_profile_display_pictures(username, profile_id)
-                user_dps[profile_id] = {}
-                user_dps[profile_id]['images'] = dps
-                user_dps[profile_id]['username'] = username
 
-            except Exception as e:
-                print('Error: {}'.format(e))
-                print('error with: {}, profile_id: {}'.format(username, profile_id))
+    # upl: username profile_id list
+    # qid: query id
+    # hnp: has next page
+    # ec : end_cursor
+    upl, qid, hnp, ec = instagram_hashtag_seed()
+    for i in tqdm(range(10), desc='batch no.'):
+        for username, profile_id, dps in p.imap_unordered(mp_instagram_profile_display_pictures, upl):
+            if username is not None:
+                tqdm.write('[!] Done: {} [{}] <{} images>'.format(username, profile_id, len(dps)))
 
-        lll, hnp, ec = get_instagram_hashtag_feed(qid, ec)
+        try:
+            upl, hnp, ec = get_instagram_hashtag_feed(qid, ec)
+
+        except:
+            # Probably got rate limited by instagram?
+            # Sleep for 5 minutes and resume
+            # but refresh and get a new query id
+            tqdm.write('[X] Probably rate limited by instagram, pausing for a random amount of time...')
+            time.sleep(random.randint(300, 500))
+
+            _, qid, _, _ = instagram_hashtag_seed()
+            upl, hnp, ec = get_instagram_hashtag_feed(qid, ec)
+
+        time.sleep(random.randint(3, 7))
 
     with open('data.json', 'w') as f:
         json.dump(user_dps, f)
