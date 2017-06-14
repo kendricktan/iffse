@@ -145,9 +145,6 @@ def get_instagram_profile_display_pictures(username, profile_id, keywords=['self
             = get_instagram_profile_next_end_cursor(query_id, profile_id, end_cursor)
         total_display_images.extend(display_images)
 
-        tqdm.write('{}: {} pictures scrapped'.format(
-            username, len(total_display_images)))
-
         if not has_next_page:
             break
 
@@ -219,13 +216,20 @@ def instagram_hashtag_seed(tags='selfie'):
 if __name__ == '__main__':
     lll, qid, hnp, ec = instagram_hashtag_seed()
 
-    dps = []
-    for idx, (username, profile_id) in enumerate(tqdm(lll)):
-        try:
-            dp = get_instagram_profile_display_pictures(username, profile_id)
-            dps.append(dp)
-        except Exception as e:
-            print('Error: {}'.format(e))
-            print('error with: {}, profile_id: {}'.format(username, profile_id))
+    user_dps = {}
+    for i in tqdm(range(10)):
+        for idx, (username, profile_id) in enumerate(tqdm(lll, desc='batch: {}'.format(i))):
+            try:
+                dps = get_instagram_profile_display_pictures(username, profile_id)
+                user_dps[profile_id] = {}
+                user_dps[profile_id]['images'] = dps
+                user_dps[profile_id]['username'] = username
 
-    print(dps)
+            except Exception as e:
+                print('Error: {}'.format(e))
+                print('error with: {}, profile_id: {}'.format(username, profile_id))
+
+        lll, hnp, ec = get_instagram_hashtag_feed(qid, ec)
+
+    with open('data.json', 'w') as f:
+        json.dump(user_dps, f)
