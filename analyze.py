@@ -1,3 +1,4 @@
+import sys
 import dlib
 
 import skimage.io as skio
@@ -7,25 +8,50 @@ import numpy as np
 
 from PIL import Image
 
+from facemaps.cv.faces import align_face_to_template
+
 detector = dlib.get_frontal_face_detector()
-predictor = dlib.shape_predictor('./pretrained/shape_predictor_68_face_landmarks.dat')
+predictor = dlib.shape_predictor(
+    './pretrained/shape_predictor_68_face_landmarks.dat')
 
-img = skio.imread('/home/kendrick/Pictures/face01.jpg')
 
-dets = detector(img, 1)
+def maybe_face_bounding_box(img):
+    """
+    Returns a bounding box if it finds
+    ONE face. Any other case, it returns
+    none
+    """
+    global detector
 
-for idx, d in enumerate(dets):
-    y = np.array([d.top(), d.top(), d.bottom(), d.bottom()])
-    x = np.array([d.left(), d.right(), d.right(), d.left()])
+    dets = detector(img, 1)
+    if len(dets) == 1:
+        return dets[0]
+    return None
 
-    rr, cc = skdr.polygon_perimeter(y, x, img.shape)
-    img[rr, cc] = 1
 
-    # Get the landmarks/parts for the face in box d.
-    # 68 land marks
-    shape = predictor(img, d)
-    for i in range(68):
-        rr, cc = skdr.circle(shape.part(i).y, shape.part(i).x, 3)
-        img[rr, cc] = 255
+def get_68_facial_landmarks(img, bb):
+    """
+    Returns a list of 68 facial landmarks
 
-Image.fromarray(img, 'RGB').show()
+    Args:
+        img: input image
+        bb: bounding box containing the face
+    """
+    global predictor
+
+    points = predictor(img, bb)
+    return list(map(lambda p: (p.x, p.y), points.parts()))
+
+
+img = skio.imread(sys.argv[1])
+
+bb = maybe_face_bounding_box(img)
+if bb is None:
+    print('No faces found, exiting.')
+    exit(0)
+
+print('Found a face')
+points = get_68_facial_landmarks(img, bb)
+img_aligned = align_face_to_template(img, points, 256)
+
+Image.fromarray(img_aligned, 'RGB').show()
