@@ -2,32 +2,17 @@
 Instagram selfie scraper, date: 2017/06/14
 Author: Kendrick Tan
 """
+import threading
 import time
 import json
 import re
 import requests
 import random
 
-from tqdm import tqdm
-from multiprocessing import Pool
+from multiprocessing import Pool, Queue
 
-
-def get_instagram_profile_page_query_id(en_commons_url):
-    """
-    Given the en_US_Commons.js url, find the query
-    id from within for a profile page
-
-    Args:
-        en_commons_url: URL for the en_Commons_url.js
-                        (can be found by viewing instagram.com source)
-
-    Returns:
-        query_id needed to query graphql
-    """
-    r = requests.get(en_commons_url)
-    query_id = re.findall(r'l="(\d+)",p="PROFILE_POSTS_UPDATED"', r.text)[0]
-
-    return query_id
+# Global queue
+g_queue = Queue()
 
 
 def get_instagram_feed_page_query_id(en_commons_url):
@@ -79,160 +64,41 @@ def get_instagram_shared_data(text):
     return json.loads(json_blob)
 
 
-def get_username_from_shortcode(shortcode):
-    """
-    Given a shortcode (e.g. 'BUwTJMRgKKD'), try and
-    find op's username (in order to get their profile page)
-
-    Args:
-        shortcode: instagram shortcode (BUTJMRgKKd)
-
-    Returns:
-        OP's username
-    """
-    shortcode_url = 'https://www.instagram.com/p/{}/'.format(shortcode)
-
-    r = requests.get(shortcode_url)
-    r_js = get_instagram_shared_data(r.text)
-    username = r_js['entry_data']['PostPage'][0]['graphql']['shortcode_media']['owner']['username']
-    return username
-
-
-def get_instagram_profile_next_end_cursor(query_id, profile_id, end_cursor, keywords=['selfie']):
-    """
-    Given the next endcursor, retrieve the list
-    of profile pic URLS and if 'has_next_page'
-    """
-    next_url = "https://www.instagram.com/graphql/query/?query_id={}&id={}&first=12&after={}".format(
-        query_id, profile_id, end_cursor)
-
-    r = requests.get(next_url)
-    r_json = json.loads(r.text)
-
-    # Gets next page info
-    # Try catch if there's no next page
-    try:
-        edge_timeline_media = r_json['data']['user']['edge_owner_to_timeline_media']
-        page_info = edge_timeline_media['page_info']
-        has_next_page, end_cursor = page_info['has_next_page'], page_info['end_cursor']
-    except:
-        return [], False, None
-
-    # Accumulates all display pictures here
-    display_pictures = []
-    for i in edge_timeline_media['edges']:
-        for keyword in keywords:
-            # Try escape when there's no caption
-            try:
-                if keyword.lower() in i['node']['edge_media_to_caption']['edges'][0]['node']['text']:
-                    display_pictures.append(i['node']['display_url'])
-            except:
-                pass
-
-    return display_pictures, has_next_page, end_cursor
-
-
-def get_instagram_profile_display_pictures(username, profile_id, keywords=['selfie'], max_pics=3):
-    """
-    Given an instagram username, traverse their profile
-    and scrap <num_pics> of their display pictures
-
-    Args:
-        username:   Instagram username
-        profile_id: Instagram profile_id
-        keywords:   List of keywords. Scraps display_url if one of
-                    the keyword is present in the photo caption
-        max_pics:   Maximum number of pictures to get that contains
-                    a keyword
-    """
-    # Total display images scraped
-    total_display_images = []
-
-    r = requests.get('https://www.instagram.com/{}/'.format(username))
-    r_js = get_instagram_shared_data(r.text)
-    media_json = r_js['entry_data']['ProfilePage'][0]['user']['media']
-
-    # Unique query id for each profile view
-    en_common_js_url = get_instagram_us_common_js(r.text)
-    query_id = get_instagram_profile_page_query_id(en_common_js_url)
-
-    # Get the first 12 display pictures
-    # Only add them to database if they have
-    # a 'selfie' caption
-    for pic in media_json['nodes']:
-        for keyword in keywords:
-            # Try escape in case there's no caption
-            try:
-                if keyword.lower() in pic['caption'].lower():
-                    total_display_images.append(pic['display_src'])
-                    break
-            except:
-                pass
-
-    # Next N pictures are a bit different
-    end_cursor = media_json['page_info']['end_cursor']
-    has_next_page = media_json['page_info']['has_next_page']
-
-    # Only want to scrap entire feed, just want
-    # to go through 81 photos (12 initial + 60 traversed)
-    for i in range(6):
-        display_images, has_next_page, end_cursor \
-            = get_instagram_profile_next_end_cursor(query_id, profile_id, end_cursor)
-        total_display_images.extend(display_images)
-
-        if not has_next_page or len(total_display_images) > max_pics:
-            break
-
-    return username, profile_id, total_display_images
-
-
-def mp_instagram_profile_display_pictures(args):
-    """
-    Multiprocessing function for get_instagram_profile_display_pictures
-    """
-    username, profile_id = args
-
-    try:
-        return get_instagram_profile_display_pictures(username, profile_id)
-    except:
-        return None, None, None
-
-
-def get_instagram_hashtag_feed(query_id, end_cursor, tags='selfie'):
+def get_instagram_hashtag_feed(query_id, end_cursor, tag_name='selfie'):
     """
     Traverses through instagram's hashtag feed, using the
     graphql endpoint
     """
     feed_url = 'https://www.instagram.com/graphql/query/?query_id={}&' \
                'tag_name={}&first=9&after={}'.format(
-                   query_id, tags, end_cursor)
+                   query_id, tag_name, end_cursor)
 
     r = requests.get(feed_url)
     r_js = json.loads(r.text)
 
     # Has next page or nah
     page_info = r_js['data']['hashtag']['edge_hashtag_to_media']['page_info']
-    has_next_page, end_cursor = page_info['has_next_page'], page_info['end_cursor']
+    end_cursor = page_info['has_next_page']
 
     edges = r_js['data']['hashtag']['edge_hashtag_to_media']['edges']
 
-    usernames = []
-    profile_ids = []
-    for i in edges:
-        profile_ids.append(i['node']['owner']['id'])
-        usernames.append(
-            get_username_from_shortcode(i['node']['shortcode'])
-        )
+    display_srcs = []
+    shortcodes = []
 
-    return list(zip(usernames, profile_ids)), has_next_page, end_cursor
+    for e in edges:
+        shortcodes.append(e['node']['shortcode'])
+        display_srcs.append(e['node']['display_url'])
+
+    return list(zip(shortcodes, display_srcs)), end_cursor
 
 
-def instagram_hashtag_seed(tags='selfie'):
+def instagram_hashtag_seed(tag_name='selfie'):
     """
     Seed function that calls instagram's hashtag page
     in order to obtain the end_cursor thingo
     """
-    r = requests.get('https://www.instagram.com/explore/tags/{}/'.format(tags))
+    r = requests.get(
+        'https://www.instagram.com/explore/tags/{}/'.format(tag_name))
     r_js = get_instagram_shared_data(r.text)
 
     # To get the query id
@@ -240,8 +106,8 @@ def instagram_hashtag_seed(tags='selfie'):
     query_id = get_instagram_feed_page_query_id(en_common_js_url)
 
     # Concat first 12 username and profile_ids here
-    usernames = []
-    profile_ids = []
+    shortcodes = []
+    display_srcs = []
 
     # Fb works by firstly calling the first page
     # and loading the HTML and all that jazz, so
@@ -250,52 +116,95 @@ def instagram_hashtag_seed(tags='selfie'):
     # calling the graphql api endpoint with a
     # specified end_cursor
     media_json = r_js['entry_data']['TagPage'][0]['tag']['media']
-    for i in media_json['nodes']:
-        profile_ids.append(i['owner']['id'])
-        usernames.append(get_username_from_shortcode(i['code']))
+    for m in media_json['nodes']:
+        shortcodes.append(m['code'])
+        display_srcs.append(m['display_src'])
 
     page_info = media_json['page_info']
-    has_next_page, end_cursor = page_info['has_next_page'], page_info['end_cursor']
+    end_cursor = page_info['has_next_page']
 
-    return list(zip(usernames, profile_ids)), query_id, has_next_page, end_cursor
+    # How many times do we need to scroll through
+    # 9 photos at a time to get every single feed
+    # Algo: (count - 12) / 12
+    # 12 images during first req and 12  for the proceeding
+    media_count = media_json['count']
+    iterations_needed = int((media_count - 12) / 12)
+
+    return list(zip(shortcodes, display_srcs)), query_id, end_cursor, iterations_needed
+
+
+def mp_instagram_hashtag_feed_to_queue(args):
+    """
+    Multiprocessing function for scraping instagram hashtag feed
+
+    Returns:
+        (Success, shortcodes, display_srcs)
+    """
+    global g_queue
+
+    shortcodes, display_srcs = args
+
+    try:
+        # Do facial recognition here:
+        # 1. Find if there's > 1 face, if there's > 1 face, discard
+        # 2. Reorientated face
+        # 3. Save a copy of the urls and whatnot
+        pass
+
+    except Exception as e:
+        return False, shortcodes, display_srcs, e
+
+    return True, shortcodes, display_srcs, 0
+
+
+def maybe_get_next_instagram_hashtag_feed(qid, ec):
+    """
+    Trys to get instagram hashtag feed, it it can't
+    changes query id and calls itself again
+    """
+    try:
+        sds, ec = get_instagram_hashtag_feed(qid, ec)
+
+    except Exception as e:
+        print('!!!! Error: {} !!!!'.format(e))
+        print('!!!! Instagram probably rate limited us... whoops !!!!')
+        print('!!!! Pausing for 3-5 minutes !!!!')
+        time.sleep(random.randint(180, 300))
+
+        # Get new query id
+        _, new_qid, _, _ = instagram_hashtag_seed()
+
+        # Calls itself infinitely until it returns
+        # #untested
+        return maybe_get_next_instagram_hashtag_feed(new_qid, ec)
+
+    return sds, qid, ec
 
 
 if __name__ == '__main__':
     p = Pool()
 
-    user_dps = {}
+    # sds: Shortcodes, display_srcs
+    # qid: query_id
+    # ec : end cursor
+    # itn: iterations needed
+    sds, qid, ec, itn = instagram_hashtag_seed()
 
-    # upl: username profile_id list
-    # qid: query id
-    # hnp: has next page
-    # ec : end_cursor
-    upl, qid, hnp, ec = instagram_hashtag_seed()
-    for i in tqdm(range(10), desc='batch no.'):
-        for username, profile_id, dps in p.imap_unordered(mp_instagram_profile_display_pictures, upl):
-            if username is not None:
-                tqdm.write('[!] Done: {} [{}] <{} images>'.format(
-                    username, profile_id, len(dps))
-                )
+    sc_dp_json = {}
+    for idx in range(1, 5):
+        # success, shortcodes, display src, latent value
+        for s_, sc_, dp_, lv_ in p.imap_unordered(mp_instagram_hashtag_feed_to_queue, sds):
 
-                user_dps[profile_id] = {}
-                user_dps[profile_id]['images'] = dps
-                user_dps[profile_id]['uesrname'] = username
+            if s_:
+                print("[{}] Success: {}".format(time.ctime(), sc_))
+                sc_dp_json[sc_] = dp_
 
-        try:
-            upl, hnp, ec = get_instagram_hashtag_feed(qid, ec)
+            else:
+                print("[{}] ====> Failed: {}".format(time.ctime(), sc_))
 
-        except:
-            # Probably got rate limited by instagram?
-            # Sleep for 5 minutes and resume
-            # but refresh and get a new query id
-            tqdm.write(
-                '[X] Probably rate limited by instagram, pausing for a random amount of time...')
-            time.sleep(random.randint(300, 500))
-
-            _, qid, _, _ = instagram_hashtag_seed()
-            upl, hnp, ec = get_instagram_hashtag_feed(qid, ec)
-
-        time.sleep(random.randint(3, 7))
+        # Get next batch
+        sds, qid, ec = maybe_get_next_instagram_hashtag_feed(qid, ec)
+        time.sleep(random.random() * 2)
 
     with open('data.json', 'w') as f:
-        json.dump(user_dps, f)
+        json.dump(sc_dp_json, f)
