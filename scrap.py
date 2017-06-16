@@ -11,6 +11,9 @@ import random
 
 from multiprocessing import Pool, Queue
 
+# Headers to mimic mozilla
+HEADERS = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36'}
+
 # Global queue
 g_queue = Queue()
 
@@ -27,8 +30,14 @@ def get_instagram_feed_page_query_id(en_commons_url):
     Returns:
         query_id needed to query graphql
     """
-    r = requests.get(en_commons_url)
-    query_id = re.findall(r'c="(\d+)",l="TAG_MEDIA_UPDATED"', r.text)[0]
+    r = requests.get(en_commons_url, headers=HEADERS)
+
+    # Has multiple ways of passing query id
+    # (They using a nightly build...)
+    query_id = re.findall(r'c="(\d+)",l="TAG_MEDIA_UPDATED"', r.text)
+    if len(query_id) == 0:
+        query_id = re.findall(r'byTagName.get\(t\).pagination},queryId:"(\d+)",queryParams', r.text)
+    query_id = query_id[0]
 
     return query_id
 
@@ -52,7 +61,7 @@ def get_instagram_shared_data(text):
     """
     Given a Instagram HTML page, return the
     'shared_data' json object
-
+G
     Args:
         text: Raw html source for instagram
 
@@ -70,15 +79,15 @@ def get_instagram_hashtag_feed(query_id, end_cursor, tag_name='selfie'):
     graphql endpoint
     """
     feed_url = 'https://www.instagram.com/graphql/query/?query_id={}&' \
-               'tag_name={}&first=9&after={}'.format(
+               'tag_name={}&first=6&after={}'.format(
                    query_id, tag_name, end_cursor)
 
-    r = requests.get(feed_url)
+    r = requests.get(feed_url, headers=HEADERS)
     r_js = json.loads(r.text)
 
     # Has next page or nah
     page_info = r_js['data']['hashtag']['edge_hashtag_to_media']['page_info']
-    end_cursor = page_info['has_next_page']
+    end_cursor = page_info['end_cursor']
 
     edges = r_js['data']['hashtag']['edge_hashtag_to_media']['edges']
 
@@ -98,7 +107,8 @@ def instagram_hashtag_seed(tag_name='selfie'):
     in order to obtain the end_cursor thingo
     """
     r = requests.get(
-        'https://www.instagram.com/explore/tags/{}/'.format(tag_name))
+        'https://www.instagram.com/explore/tags/{}/'.format(tag_name),
+        headers=HEADERS)
     r_js = get_instagram_shared_data(r.text)
 
     # To get the query id
@@ -121,7 +131,7 @@ def instagram_hashtag_seed(tag_name='selfie'):
         display_srcs.append(m['display_src'])
 
     page_info = media_json['page_info']
-    end_cursor = page_info['has_next_page']
+    end_cursor = page_info['end_cursor']
 
     # How many times do we need to scroll through
     # 9 photos at a time to get every single feed
