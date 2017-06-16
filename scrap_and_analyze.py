@@ -27,7 +27,7 @@ from peewee import OperationalError
 
 from torch.autograd import Variable
 
-from facemaps.data.database import db, SelfiePost
+from facemaps.data.database import db, SelfiePost, FacialEmbeddings
 from facemaps.utils.helpers import string_to_np, np_to_string
 from facemaps.utils.ml.open_face import load_openface_net
 from facemaps.utils.cv.faces import (
@@ -212,28 +212,45 @@ def mp_instagram_hashtag_feed_to_queue(args):
         bb = maybe_face_bounding_box(detector, img)
 
         if bb is None:
-            print("[{}] No / Too many faces: {}".format(time.ctime(), shortcode))
+            print("[{}] No faces: {}".format(time.ctime(), shortcode))
             return
 
-        # Get 68 landmarks
-        points = get_68_facial_landmarks(predictor, img, bb)
+        # Iterate through each possible bounding box
+        img_tensor = None
+        for idx, b in enumerate(bb):
+            # Get 68 landmarks
+            points = get_68_facial_landmarks(predictor, img, b)
 
-        # Realign image and resize
-        # to 96 x 96 (network input)
-        img_aligned = align_face_to_template(img, points, 96)
+            # Realign image and resize
+            # to 96 x 96 (network input)
+            img_aligned = align_face_to_template(img, points, 96)
 
-        # Convert to tensor
-        img_tensor = transform(img_aligned)
+            # Convert to temporary tensor
+            img_tensor_temp = transform(img_aligned)
+            img_tensor_temp = img_tensor_temp.view(1, 3, 96, 96)
+
+            # Essentially makes a 'batch' size
+            if img_tensor is None:
+                img_tensor = img_tensor_temp
+
+            else:
+                img_tensor = torch.cat((img_tensor, img_tensor_temp), 0)
+
+        # Create a selfie post
+        # attach all latent space to this foreign key
+        s = SelfiePost(shortcode=shortcode, img_url=display_url)
+        s.save()
 
         # Pass through network
-        # get 128 latent space
-        img_tensor = img_tensor.view(1, 3, 96, 96)
+        # get NUM_FACES x 128 latent space
         np_features = pyopenface(Variable(img_tensor))[0].data.numpy()
 
-        # Convert to string and store in db
-        np_str = np_to_string(np_features)
-        s = SelfiePost(shortcode=shortcode, img_url=display_url, latent_space=np_str)
-        s.save()
+        for np_feature in np_features:
+            # Convert to string and store in db
+            np_str = np_to_string(np_feature)
+            fe = FacialEmbeddings(op=s, latent_space=np_str)
+            fe.save()
+
         print("[{}] Success: {}".format(time.ctime(), shortcode))
 
     except Exception as e:
@@ -267,7 +284,7 @@ def maybe_get_next_instagram_hashtag_feed(qid, ec):
 if __name__ == '__main__':
     try:
         db.connect()
-        db.create_tables([SelfiePost])
+        db.create_tables([SelfiePost, FacialEmbeddings])
 
     except OperationalError:
         pass

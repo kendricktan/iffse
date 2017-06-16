@@ -59,8 +59,8 @@ def maybe_face_bounding_box(detector, img):
         img: image
     """
     dets = detector(img, 1)
-    if len(dets) == 1:
-        return dets[0]
+    if len(dets) >= 1:
+        return dets
     return None
 
 

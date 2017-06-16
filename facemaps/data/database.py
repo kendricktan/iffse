@@ -3,6 +3,7 @@ from peewee import (
     TextField,
     SqliteDatabase,
     OperationalError,
+    ForeignKeyField,
     Model
 )
 
@@ -15,8 +16,14 @@ class SelfiePost(Model):
     shortcode = CharField(unique=True)
     img_url = TextField()
 
-    # 128 embedding
-    latent_space = TextField()
+    class Meta:
+        database = db
+
+
+class FacialEmbeddings(Model):
+    # Original Post
+    op = ForeignKeyField(SelfiePost, related_name='op')
+    latent_space = CharField()
 
     class Meta:
         database = db
