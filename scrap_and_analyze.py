@@ -8,14 +8,59 @@ import json
 import re
 import requests
 import random
+import h5py
 
+import sys
+import dlib
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+import torchvision.transforms as transforms
+
+import skimage.io as skio
+import skimage.draw as skdr
+import numpy as np
+
+from peewee import OperationalError
+
+from torch.autograd import Variable
+
+from facemaps.data.database import db, SelfiePost
+from facemaps.utils.helpers import string_to_np, np_to_string
+from facemaps.utils.ml.open_face import load_openface_net
+from facemaps.utils.cv.faces import (
+    align_face_to_template,
+    maybe_face_bounding_box,
+    get_68_facial_landmarks
+)
+
+from io import BytesIO
+from PIL import Image
 from multiprocessing import Pool, Queue
 
+# Global vars
 # Headers to mimic mozilla
-HEADERS = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36'}
+HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36'}
 
-# Global queue
-g_queue = Queue()
+# Network to get embeddings
+pyopenface = load_openface_net(
+    './pretrained_weights/openface.pth', cuda=False).eval()
+
+# Dlib to preprocess images
+detector = dlib.get_frontal_face_detector()
+predictor = dlib.shape_predictor(
+    './pretrained_weights/shape_predictor_68_face_landmarks.dat'
+)
+
+transform = transforms.Compose(
+    [
+        transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+    ]
+)
 
 
 def get_instagram_feed_page_query_id(en_commons_url):
@@ -36,7 +81,8 @@ def get_instagram_feed_page_query_id(en_commons_url):
     # (They using a nightly build...)
     query_id = re.findall(r'c="(\d+)",l="TAG_MEDIA_UPDATED"', r.text)
     if len(query_id) == 0:
-        query_id = re.findall(r'byTagName.get\(t\).pagination},queryId:"(\d+)",queryParams', r.text)
+        query_id = re.findall(
+            r'byTagName.get\(t\).pagination},queryId:"(\d+)",queryParams', r.text)
     query_id = query_id[0]
 
     return query_id
@@ -152,19 +198,46 @@ def mp_instagram_hashtag_feed_to_queue(args):
     """
     global g_queue
 
-    shortcodes, display_srcs = args
+    shortcode, display_url = args
 
     try:
-        # Do facial recognition here:
-        # 1. Find if there's > 1 face, if there's > 1 face, discard
-        # 2. Reorientated face
-        # 3. Save a copy of the urls and whatnot
-        pass
+        # Facial recognition logic here:
+        # Download copy of image
+        # Convert RGB and then to numpy
+        r = requests.get(display_url, headers=HEADERS)
+        img = Image.open(BytesIO(r.content)).convert("RGB")
+        img = np.array(img)
+
+        # Get bounding box
+        bb = maybe_face_bounding_box(detector, img)
+
+        if bb is None:
+            print("[{}] No / Too many faces: {}".format(time.ctime(), shortcode))
+            return
+
+        # Get 68 landmarks
+        points = get_68_facial_landmarks(predictor, img, bb)
+
+        # Realign image and resize
+        # to 96 x 96 (network input)
+        img_aligned = align_face_to_template(img, points, 96)
+
+        # Convert to tensor
+        img_tensor = transform(img_aligned)
+
+        # Pass through network
+        # get 128 latent space
+        img_tensor = img_tensor.view(1, 3, 96, 96)
+        np_features = pyopenface(Variable(img_tensor))[0].data.numpy()
+
+        # Convert to string and store in db
+        np_str = np_to_string(np_features)
+        s = SelfiePost(shortcode=shortcode, img_url=display_url, latent_space=np_str)
+        s.save()
+        print("[{}] Success: {}".format(time.ctime(), shortcode))
 
     except Exception as e:
-        return False, shortcodes, display_srcs, e
-
-    return True, shortcodes, display_srcs, 0
+        print("[{}] ====> Failed: {}, {}".format(time.ctime(), shortcode, e))
 
 
 def maybe_get_next_instagram_hashtag_feed(qid, ec):
@@ -192,6 +265,13 @@ def maybe_get_next_instagram_hashtag_feed(qid, ec):
 
 
 if __name__ == '__main__':
+    try:
+        db.connect()
+        db.create_tables([SelfiePost])
+
+    except OperationalError:
+        pass
+
     p = Pool()
 
     # sds: Shortcodes, display_srcs
@@ -200,21 +280,14 @@ if __name__ == '__main__':
     # itn: iterations needed
     sds, qid, ec, itn = instagram_hashtag_seed()
 
-    sc_dp_json = {}
-    for idx in range(1, 5):
+    while True:
         # success, shortcodes, display src, latent value
-        for s_, sc_, dp_, lv_ in p.imap_unordered(mp_instagram_hashtag_feed_to_queue, sds):
-
-            if s_:
-                print("[{}] Success: {}".format(time.ctime(), sc_))
-                sc_dp_json[sc_] = dp_
-
-            else:
-                print("[{}] ====> Failed: {}".format(time.ctime(), sc_))
+        p.map_async(mp_instagram_hashtag_feed_to_queue, sds)
 
         # Get next batch
         sds, qid, ec = maybe_get_next_instagram_hashtag_feed(qid, ec)
         time.sleep(random.random() * 2)
 
-    with open('data.json', 'w') as f:
-        json.dump(sc_dp_json, f)
+    # Wait for pool to close
+    p.close()
+    p.join()

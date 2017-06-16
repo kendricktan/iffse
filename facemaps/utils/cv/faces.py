@@ -48,6 +48,35 @@ INNER_EYES_AND_BOTTOM_LIP = [39, 42, 57]
 OUTER_EYES_AND_NOSE = [36, 45, 33]
 
 
+def maybe_face_bounding_box(detector, img):
+    """
+    Returns a bounding box if it finds
+    ONE face. Any other case, it returns
+    none
+
+    Args:
+        detector: dlib.get_front_face_detector()
+        img: image
+    """
+    dets = detector(img, 1)
+    if len(dets) == 1:
+        return dets[0]
+    return None
+
+
+def get_68_facial_landmarks(predictor, img, bb):
+    """
+    Returns a list of 68 facial landmarks
+
+    Args:
+        predictor: dlibs.shape_predict(_FILE_)
+        img: input image
+        bb: bounding box containing the face
+    """
+    points = predictor(img, bb)
+    return list(map(lambda p: (p.x, p.y), points.parts()))
+
+
 def align_face_to_template(img, facial_landmarks, output_dim, landmarkIndices=INNER_EYES_AND_BOTTOM_LIP):
     """
     Aligns image by warping it to fit the landmarks on

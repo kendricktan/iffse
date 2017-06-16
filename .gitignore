@@ -105,4 +105,4 @@ ENV/
 
 # Database
 faces_of_instagram/
-pretrained/
+pretrained_weights/
