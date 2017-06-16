@@ -8,3 +8,4 @@ conda install -c menpo dlib=19.4
 
 References:
 Openface - align facial landmarks code
+https://github.com/thnkim/OpenFacePytorch
