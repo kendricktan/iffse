@@ -179,14 +179,9 @@ def instagram_hashtag_seed(tag_name='selfie'):
     page_info = media_json['page_info']
     end_cursor = page_info['end_cursor']
 
-    # How many times do we need to scroll through
-    # 9 photos at a time to get every single feed
-    # Algo: (count - 12) / 12
-    # 12 images during first req and 12  for the proceeding
-    media_count = media_json['count']
-    iterations_needed = int((media_count - 12) / 12)
+    print('[{}] Got seed page for instagram tag: {}'.format(time.ctime(), tag_name))
 
-    return list(zip(shortcodes, display_srcs)), query_id, end_cursor, iterations_needed
+    return list(zip(shortcodes, display_srcs)), query_id, end_cursor
 
 
 def mp_instagram_hashtag_feed_to_queue(args):
@@ -198,7 +193,7 @@ def mp_instagram_hashtag_feed_to_queue(args):
     """
     global g_queue
 
-    shortcode, display_url = args
+    shortcode, display_url, tag = args
 
     try:
         # Facial recognition logic here:
@@ -212,7 +207,7 @@ def mp_instagram_hashtag_feed_to_queue(args):
         bb = maybe_face_bounding_box(detector, img)
 
         if bb is None:
-            print("[{}] No faces: {}".format(time.ctime(), shortcode))
+            print("[{}] No faces: {} <{}>".format(time.ctime(), shortcode, tag))
             return
 
         # Iterate through each possible bounding box
@@ -251,32 +246,32 @@ def mp_instagram_hashtag_feed_to_queue(args):
             fe = FacialEmbeddings(op=s, latent_space=np_str)
             fe.save()
 
-        print("[{}] Success: {}".format(time.ctime(), shortcode))
+        print("[{}] Success: {} <{}>".format(time.ctime(), shortcode, tag))
 
     except Exception as e:
         print("[{}] ====> Failed: {}, {}".format(time.ctime(), shortcode, e))
 
 
-def maybe_get_next_instagram_hashtag_feed(qid, ec):
+def maybe_get_next_instagram_hashtag_feed(qid, ec, tag):
     """
     Trys to get instagram hashtag feed, it it can't
     changes query id and calls itself again
     """
     try:
-        sds, ec = get_instagram_hashtag_feed(qid, ec)
+        sds, ec = get_instagram_hashtag_feed(qid, ec, tag)
 
     except Exception as e:
         print('!!!! Error: {} !!!!'.format(e))
         print('!!!! Instagram probably rate limited us... whoops !!!!')
-        print('!!!! Pausing for 3-5 minutes !!!!')
-        time.sleep(random.randint(180, 300))
+        print('!!!! Pausing for ~1 minute !!!!')
+        time.sleep(random.randint(30, 60))
 
         # Get new query id
         _, new_qid, _, _ = instagram_hashtag_seed()
 
         # Calls itself infinitely until it returns
-        # #untested
-        return maybe_get_next_instagram_hashtag_feed(new_qid, ec)
+        # # untested
+        return maybe_get_next_instagram_hashtag_feed(new_qid, ec, tag)
 
     return sds, qid, ec
 
@@ -289,21 +284,33 @@ if __name__ == '__main__':
     except OperationalError:
         pass
 
+    # What kind of tags do we want to scrap
+    tags_to_be_scraped = ['selfie', 'selfportait', 'dailylook', 'selfiesunday']
+    tags_to_be_scraped_dict = {
+        k: instagram_hashtag_seed(k) for k in tags_to_be_scraped
+    }
+
+    # Multithreading pool here
     p = Pool()
 
     # sds: Shortcodes, display_srcs
     # qid: query_id
     # ec : end cursor
-    # itn: iterations needed
-    sds, qid, ec, itn = instagram_hashtag_seed()
+    # sds, qid, ec = instagram_hashtag_seed()
 
     while True:
-        # Async map through all given shortcodes
-        p.map_async(mp_instagram_hashtag_feed_to_queue, sds)
+        for tag in tags_to_be_scraped_dict:
+            sds, qid, ec = tags_to_be_scraped_dict[tag]
+            mp_args = list(map(lambda x: (x[0], x[1], tag), sds))
 
-        # Get next batch
-        sds, qid, ec = maybe_get_next_instagram_hashtag_feed(qid, ec)
-        time.sleep(random.random() * 2)
+            # Async map through all given shortcodes
+            p.map_async(mp_instagram_hashtag_feed_to_queue, mp_args)
+
+            # Get next batch
+            sds, qid, ec = maybe_get_next_instagram_hashtag_feed(qid, ec, tag)
+            tags_to_be_scraped_dict[tag] = (sds, qid, ec)
+
+        time.sleep(random.random())
 
     # Wait for pool to close
     p.close()
