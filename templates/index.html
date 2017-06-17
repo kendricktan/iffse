@@ -32,17 +32,19 @@
             text-align: center;
         }
 
-        div.vertical-line {
-            width: 1px;
-            /* Line width */
+        .button-black {
             background-color: black;
-            /* Line color */
-            height: 100%;
-            /* Override in-line if you want specific height. */
-            float: left;
-            /* Causes the line to float to left of content. 
-        You can instead use position:absolute or display:inline-block
-        if this fits better with your design */
+            border-color: black;
+        }
+
+        .button-black.button-clear,
+        .button-black.button-outline {
+            background-color: transparent;
+            color: black;
+        }
+
+        .button-black.button-clear {
+            border-color: transparent;
         }
     </style>
 </head>
@@ -71,39 +73,34 @@
         <div class="row">
             <div class="column column-80 column-offset-10">
                 <h2>Search</h2>
-                <form>
-                    <input class="button button-outline" type="submit" value="find similar faces" style="float: right" />
-                    <div style="overflow: hidden; padding-right: .5em;">
-                        <input type="text" style="width: 100%;" placeholder="instagram.com/p/BVbcg5jFPSv/" id="instaPostField">
-                    </div>
-                </form>
-                
+                <button class="button-black button-outline" onclick="searchInstaPost()" style="float: right">find similar faces</button>
+                <div style="overflow: hidden; padding-right: .5em;">
+                    <input type="text" style="width: 100%;" placeholder="instagram.com/p/BVbcg5jFPSv/" id="instaPostField"/>
+                </div>
             </div>
         </div>
+
+        <br/>
+        <br/>
 
         <!-- Image submitted / similar faces -->
         <div class="row">
             <div class="column column-80 column-offset-10">
-                <div>
-                    <p>
-                        <h3>5 faces found, displaying results for:</h3>
-                        <select style="width: 100%;" id="ageRangeField">
-                                <option value="0">Person 1</option>
-                                <option value="1">Person 2</option>     
-                            </select>
-                    </p>
+                <div id="selectFoundFaceDiv">                                    
                 </div>
 
+                <br/>
+
                 <div style="text-align: center">
-                    <img src="https://instagram.fbne3-1.fna.fbcdn.net/t51.2885-15/e35/19120509_1906775546206310_6366234808007262208_n.jpg" />
+                    <img width=200px id="selectedFaceImg" />
                 </div>
 
                 <br/>
 
                 <h3>Results</h3>
 
-                    <div align="center" id="iffseResults">                        
-                    </div>
+                <div align="center" id="iffseResults">
+                </div>
             </div>
         </div>
 
@@ -117,33 +114,92 @@
         </div>
 
     </div>
-    
+
     <script async="" defer="defer" src="//platform.instagram.com/en_US/embeds.js"></script>
 
     <script>
+        function displayNewFace(selectObj){
+            // Set image source
+            var img_ = document.getElementById('selectedFaceImg');
+            img_.src = "data:image/png;base64," + global_data[selectObj.value]['face']
+            
+            // Set Results
+            var resultsDiv = document.getElementById('iffseResults');
+            resultsDiv.innerHTML = '';
+            loadInstaEmbedOrdered(global_data[selectObj.value]['shortcodes'])
+        }
+
+        // Create new dropdown menu
+        function newFacesDropDown(data){
+            // Our new dropdown thingo
+            // Create new option for our dropdown select thingo
+            var selectNode = document.createElement('select');                 
+            for (var i in data){
+                var op = new Option();
+                op.value = i;                
+                op.text = 'Person: ' + (parseInt(i) + 1);
+                selectNode.options.add(op)
+            }
+            selectNode.setAttribute('onchange', 'displayNewFace(this)');
+            selectNode.id = 'faceDropDown';
+            
+            // h3 to display results
+            var labelNode = document.createElement('h3')
+            labelNode.innerText = Object.keys(data).length + " faces found, displaying results for:"        
+
+            // Get our display div and yeah...
+            // Clear it and append new stuff
+            var selectFoundFaceDiv = document.getElementById('selectFoundFaceDiv');            
+            selectFoundFaceDiv.innerHTML = '';
+            selectFoundFaceDiv.appendChild(labelNode);
+            selectFoundFaceDiv.appendChild(selectNode);
+
+            // Programatically set the 1st index
+            var select_ = document.getElementById('faceDropDown');
+            select_.value = 0;
+            select_.onchange();
+        }
+
+        // Search button on click
+        function searchInstaPost() {
+            var url = document.getElementById('instaPostField').value;
+            $.ajax({
+                type: 'POST',
+                url: '/search',
+                dataType: 'json',
+                contentType: 'application/json; charset=utf-8',
+                data: JSON.stringify({
+                    'url': url,
+                }),
+                success: function (data) {    
+                    // Using globals because i'm a pleb                
+                    global_data = data['data']
+                    newFacesDropDown(data['data']);                    
+                }
+            });
+        }
+
         // Loads instagram post in order of the
         // provided shortcodes
-        function load_insta_embed_ordered(shortcodes){            
-            if (shortcodes.length > 0){
+        function loadInstaEmbedOrdered(shortcodes) {
+            if (shortcodes.length > 0) {
                 $.ajax({
-                    url: 'https://api.instagram.com/oembed/?url=https://www.instagram.com/p/'+ shortcodes[0] + '/&hidecaption=0',
+                    type: 'GET',
+                    url: 'https://api.instagram.com/oembed/?url=https://www.instagram.com/p/' + shortcodes[0] + '/&hidecaption=0',
                     dataType: 'jsonp',
                     success: function (data) {
                         var resultsDiv = document.getElementById('iffseResults');
                         resultsDiv.innerHTML += data['html'];
                         window.instgrm.Embeds.process()
-                    }
-                }).done(function() {
-                    load_insta_embed_ordered(shortcodes.slice(1));
+                    },
+                }).done(function () {
+                    loadInstaEmbedOrdered(shortcodes.slice(1));
+                }).fail(function () {
+                    loadInstaEmbedOrdered(shortcodes.slice(1));
                 });
-            }            
+            }
         }
-
-        window.onload = function () {            
-            var shortcodes = ['BVbq_YOAoGp', 'BVboKJxAOmP', 'BVbt18-lsou', 'BVbt1ncgkob']
-            load_insta_embed_ordered(shortcodes);
-        }
-    </script>    
+    </script>
 </body>
 
 </html>

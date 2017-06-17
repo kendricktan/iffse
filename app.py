@@ -1,25 +1,155 @@
+import base64
 import os
 import jinja2
+import requests
+
+from io import BytesIO
 
 from sanic import Sanic, response
-from sanic_cors import CORS, cross_origin
 
+from annoy import AnnoyIndex
+from config import CONFIG
+
+from iffse.utils.helpers import string_to_np, np_to_string
+from iffse.data.database import FacialEmbeddings, SelfiePost
+from scrapper import (
+    get_instagram_shared_data,
+    img_url_to_latent_space,
+    img_url_to_pillow
+)
+
+# Global vars
 app = Sanic(__name__)
-CORS(app)
+app.static('/favicon.ico', './static/favicon.ico')
+
+annoy_settings = CONFIG['annoy_tree_settings']
+annoy_tree = AnnoyIndex(128, metric=annoy_settings['metric'])
+
+# Helper functions
+
+
+def get_shortcode_from_facialembeddings_id(fe_id):
+    """
+    Returns a shortcode given from the
+    facial embedding id
+    """
+    return FacialEmbeddings.get(id=fe_id).op.shortcode
+
+
+def get_unique_shortcodes_from_fe_ids(fe):
+    """
+    Args:
+        fe: facial embedding vector
+
+    Returns:
+        Shortcodes for the corresponding indexes
+    """
+    global annoy_tree
+
+    idxs = annoy_tree.get_nns_by_vector(fe, 20)
+
+    shortcodes_unique = []
+    for i in idxs[1:]:
+        s_ = get_shortcode_from_facialembeddings_id(i)
+        if s_ not in shortcodes_unique:
+            shortcodes_unique.append(s_)
+
+    return shortcodes_unique
+
+
+def pillow_to_base64(pil_img):
+    """
+    Converts pillow image to base64
+    so it can be sent back withou refreshing
+    """
+    img_io = BytesIO()
+    pil_img.save(img_io, 'PNG')
+    return base64.b64encode(img_io.getvalue())
 
 
 def render_jinja2(tpl_path, context):
+    """
+    Render jinja2 html template (not used lol)
+    """
     path, filename = os.path.split(tpl_path)
     return jinja2.Environment(
         loader=jinja2.FileSystemLoader(path or './')
     ).get_template(filename).render(context)
 
 
+# Application logic
 @app.route('/')
-async def index(request):
+async def iffse_index(request):
     html_ = render_jinja2('./templates/index.html', {'WHAT': 'niggas'})
     return response.html(html_)
 
 
+@app.route('/search', methods=["POST", ])
+async def iffse_search(request):
+    try:
+        url = request.json.get('url', None)
+
+        # Get instagram json data
+        # (in order to get img url and stuff)
+        r = requests.get(url)
+        r_js = get_instagram_shared_data(r.text)
+
+        # Get display url and shortcode
+        media_json = r_js['entry_data']['PostPage'][0]['graphql']['shortcode_media']
+        display_src = media_json['display_url']
+        # shortcode = media_json['shortcode']
+
+        # Pass image into the NN and
+        # get the 128 dim embeddings
+        np_features, img, bb = img_url_to_latent_space(display_src)
+
+        # Shit crashes, maybe add to annoy later
+        # # See if post has been indexed before
+        # s, created = SelfiePost.get_or_create(
+        #     shortcode=shortcode, img_url=display_src)
+
+        # # If it hasn't been indexed before, then
+        # # add the latent embeddings into it
+        # if not created:
+        #     for np_feature in np_features:
+        #         # Convert to string and store in db
+        #         np_str = np_to_string(np_feature)
+
+        #         fe = FacialEmbeddings(op=s, latent_space=np_str)
+        #         fe.save()
+
+        #         # Add feature to annoy tree to be indexed
+        #         annoy_tree.add_item(fe.id, np_feature)
+
+        # Now we can query it
+        # For each face too
+        shortcodes = {}
+        for idx, feature in enumerate(np_features):
+            b = bb[idx]
+
+            # Crop to specific face
+            lrtp = (b.left(), b.top(), b.right(), b.bottom())
+            img_cropped = img.crop(lrtp)
+            img_base64 = pillow_to_base64(img_cropped)
+
+            # Get unique shortcode based on the features provided
+            shortcodes_unique = get_unique_shortcodes_from_fe_ids(feature)
+            shortcodes[idx] = {
+                'face': img_base64,
+                'shortcodes': shortcodes_unique
+            }
+
+        return response.json(
+            {'data': shortcodes}
+        )
+
+    except Exception as e:
+        print(e)
+        return response.json(
+            {'error': 'something fucked up lol'}
+        )
+
+
 if __name__ == '__main__':
-    app.run(host='127.0.0.1', port=8000, debug=True)
+    annoy_tree.load(CONFIG['annoy_tree'])
+    app.run(host='127.0.0.1', port=8000, debug=False)

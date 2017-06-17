@@ -47,7 +47,8 @@ HEADERS = {
 
 # Network to get embeddings
 pyopenface = load_openface_net(
-    './pretrained_weights/openface.pth', cuda=False)
+    './pretrained_weights/openface_cpu.pth', cuda=False
+)
 
 # Dlib to preprocess images
 detector = dlib.get_frontal_face_detector()
@@ -179,9 +180,76 @@ def instagram_hashtag_seed(tag_name='selfie'):
     page_info = media_json['page_info']
     end_cursor = page_info['end_cursor']
 
-    print('[{}] Got seed page for instagram tag: {}'.format(time.ctime(), tag_name))
+    print('[{}] Got seed page for instagram tag: {}'.format(
+        time.ctime(), tag_name))
 
     return list(zip(shortcodes, display_srcs)), query_id, end_cursor
+
+
+def img_url_to_pillow(display_url):
+    """
+    Returns a Pillow Image given a url
+    """
+    r = requests.get(display_url, headers=HEADERS)
+    img = Image.open(BytesIO(r.content)).convert("RGB")
+    return img
+
+
+def img_url_to_latent_space(display_url):
+    """
+    Given a display url, download the image,
+    find the faces (if any), crop them, feed
+    through the NN to get the embeddings. If
+    it fails at any stage, return 0
+
+    Args:
+        display_url: URL containing image to be id'ed
+
+    Returns:
+        None, None, None
+           or
+        N x 128 numpy array, Img, Bounding Box coordinates
+        (N is the number of faces it found on img)
+    """
+    global pyopenface
+
+    # Download copy of image
+    # Convert RGB and then to numpy
+    img_pil = img_url_to_pillow(display_url)
+    img = np.array(img_pil)
+
+    # Get bounding box
+    bb = maybe_face_bounding_box(detector, img)
+
+    if bb is None:
+        return None, None, None
+
+    # Iterate through each possible bounding box
+    img_tensor = None
+    for idx, b in enumerate(bb):
+        # Get 68 landmarks
+        points = get_68_facial_landmarks(predictor, img, b)
+
+        # Realign image and resize
+        # to 96 x 96 (network input)
+        img_aligned = align_face_to_template(img, points, 96)
+
+        # Convert to temporary tensor
+        img_tensor_temp = transform(img_aligned)
+        img_tensor_temp = img_tensor_temp.view(1, 3, 96, 96)
+
+        # Essentially makes a 'batch' size
+        if img_tensor is None:
+            img_tensor = img_tensor_temp
+
+        else:
+            img_tensor = torch.cat((img_tensor, img_tensor_temp), 0)
+
+    # Pass through network
+    # get NUM_FACES x 128 latent space
+    np_features = pyopenface(Variable(img_tensor))[0].data.numpy()
+
+    return np_features, img_pil, bb
 
 
 def mp_instagram_hashtag_feed_to_queue(args):
@@ -197,48 +265,17 @@ def mp_instagram_hashtag_feed_to_queue(args):
 
     try:
         # Facial recognition logic here:
-        # Download copy of image
-        # Convert RGB and then to numpy
-        r = requests.get(display_url, headers=HEADERS)
-        img = Image.open(BytesIO(r.content)).convert("RGB")
-        img = np.array(img)
+        np_features, _, _ = img_url_to_latent_space(display_url)
 
-        # Get bounding box
-        bb = maybe_face_bounding_box(detector, img)
-
-        if bb is None:
-            print("[{}] No faces: {} <{}>".format(time.ctime(), shortcode, tag))
+        if np_features is None:
+            print("[{}] No faces: {} <{}>".format(
+                time.ctime(), shortcode, tag))
             return
-
-        # Iterate through each possible bounding box
-        img_tensor = None
-        for idx, b in enumerate(bb):
-            # Get 68 landmarks
-            points = get_68_facial_landmarks(predictor, img, b)
-
-            # Realign image and resize
-            # to 96 x 96 (network input)
-            img_aligned = align_face_to_template(img, points, 96)
-
-            # Convert to temporary tensor
-            img_tensor_temp = transform(img_aligned)
-            img_tensor_temp = img_tensor_temp.view(1, 3, 96, 96)
-
-            # Essentially makes a 'batch' size
-            if img_tensor is None:
-                img_tensor = img_tensor_temp
-
-            else:
-                img_tensor = torch.cat((img_tensor, img_tensor_temp), 0)
 
         # Create a selfie post
         # attach all latent space to this foreign key
         s = SelfiePost(shortcode=shortcode, img_url=display_url)
         s.save()
-
-        # Pass through network
-        # get NUM_FACES x 128 latent space
-        np_features = pyopenface(Variable(img_tensor))[0].data.numpy()
 
         for np_feature in np_features:
             # Convert to string and store in db
