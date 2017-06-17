@@ -1,0 +1,149 @@
+<html>
+
+<head>
+    <title>IFFSE</title>
+
+    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/github-fork-ribbon-css/0.2.0/gh-fork-ribbon.min.css" />
+    <link rel="stylesheet" href="//fonts.googleapis.com/css?family=Roboto:300,300italic,700,700italic">
+    <link rel="stylesheet" href="//cdn.rawgit.com/milligram/milligram/master/dist/milligram.min.css">
+    <link rel="stylesheet" href="//cdn.rawgit.com/necolas/normalize.css/master/normalize.css">
+
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+
+    <style>
+        body {
+            padding-top: 50px;
+        }
+
+        img {
+            max-width: 300px;
+            height: auto;
+            width: auto\9;
+            /* ie8 */
+        }
+
+        footer {
+            background: white;
+            padding-top: 30px;
+            width: 80%;
+            bottom: 0;
+            position: fixed;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        div.vertical-line {
+            width: 1px;
+            /* Line width */
+            background-color: black;
+            /* Line color */
+            height: 100%;
+            /* Override in-line if you want specific height. */
+            float: left;
+            /* Causes the line to float to left of content. 
+        You can instead use position:absolute or display:inline-block
+        if this fits better with your design */
+        }
+    </style>
+</head>
+
+<body>
+    <a class="github-fork-ribbon left-top" href="//github.com/kendricktan/iffse/" title="Fork me on GitHub">Fork me on GitHub</a>
+
+    <div class="container">
+
+        <!-- Info & stuff -->
+        <div class="row">
+            <div class="column column-80 column-offset-10">
+                <hr/>
+                <h2>Instagram Facial Feature Search Engine</h2>
+                <span style="text-align: right">
+                    <h6>
+                        *only photos with tags <em>#selfie</em>, <em>#selfportrait</em>, <em>#dailylook</em>, <em>#selfiesunday</em> are indexed*<br/>
+                        read the <a href="//github.com/kendricktan/iffse/">project page</a> to build an IFFSE with custom tags
+                    </h6>
+                </span>
+                <hr/>
+            </div>
+        </div>
+
+        <!-- Input field -->
+        <div class="row">
+            <div class="column column-80 column-offset-10">
+                <h2>Search</h2>
+                <form>
+                    <input class="button button-outline" type="submit" value="find similar faces" style="float: right" />
+                    <div style="overflow: hidden; padding-right: .5em;">
+                        <input type="text" style="width: 100%;" placeholder="instagram.com/p/BVbcg5jFPSv/" id="instaPostField">
+                    </div>
+                </form>
+                
+            </div>
+        </div>
+
+        <!-- Image submitted / similar faces -->
+        <div class="row">
+            <div class="column column-80 column-offset-10">
+                <div>
+                    <p>
+                        <h3>5 faces found, displaying results for:</h3>
+                        <select style="width: 100%;" id="ageRangeField">
+                                <option value="0">Person 1</option>
+                                <option value="1">Person 2</option>     
+                            </select>
+                    </p>
+                </div>
+
+                <div style="text-align: center">
+                    <img src="https://instagram.fbne3-1.fna.fbcdn.net/t51.2885-15/e35/19120509_1906775546206310_6366234808007262208_n.jpg" />
+                </div>
+
+                <br/>
+
+                <h3>Results</h3>
+
+                    <div align="center" id="iffseResults">                        
+                    </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="row">
+            <div style="padding-top: 125px" class="column column-80 column-offset-10">
+                <footer class="footer">
+                    <p>bitcoin: 14VmTd7Npm27SmJgrg1eUrSPgFEHcMXVGR<br/> ethereum: 0x19Ed10db2960B9B21283FdFDe464e7bF3a87D05D</p>
+                </footer>
+            </div>
+        </div>
+
+    </div>
+    
+    <script async="" defer="defer" src="//platform.instagram.com/en_US/embeds.js"></script>
+
+    <script>
+        // Loads instagram post in order of the
+        // provided shortcodes
+        function load_insta_embed_ordered(shortcodes){            
+            if (shortcodes.length > 0){
+                $.ajax({
+                    url: 'https://api.instagram.com/oembed/?url=https://www.instagram.com/p/'+ shortcodes[0] + '/&hidecaption=0',
+                    dataType: 'jsonp',
+                    success: function (data) {
+                        var resultsDiv = document.getElementById('iffseResults');
+                        resultsDiv.innerHTML += data['html'];
+                        window.instgrm.Embeds.process()
+                    }
+                }).done(function() {
+                    load_insta_embed_ordered(shortcodes.slice(1));
+                });
+            }            
+        }
+
+        window.onload = function () {            
+            var shortcodes = ['BVbq_YOAoGp', 'BVboKJxAOmP', 'BVbt18-lsou', 'BVbt1ncgkob']
+            load_insta_embed_ordered(shortcodes);
+        }
+    </script>    
+</body>
+
+</html>

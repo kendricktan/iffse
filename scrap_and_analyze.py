@@ -27,10 +27,10 @@ from peewee import OperationalError
 
 from torch.autograd import Variable
 
-from facemaps.data.database import db, SelfiePost, FacialEmbeddings
-from facemaps.utils.helpers import string_to_np, np_to_string
-from facemaps.utils.ml.open_face import load_openface_net
-from facemaps.utils.cv.faces import (
+from iffse.data.database import db, SelfiePost, FacialEmbeddings
+from iffse.utils.helpers import string_to_np, np_to_string
+from iffse.utils.ml.open_face import load_openface_net
+from iffse.utils.cv.faces import (
     align_face_to_template,
     maybe_face_bounding_box,
     get_68_facial_landmarks

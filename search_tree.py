@@ -1,13 +1,17 @@
 import h5py
 import random
 
-from facemaps.data.database import FacialEmbeddings
+from iffse.data.database import FacialEmbeddings
 
 from annoy import AnnoyIndex
 from config import CONFIG
 
 
 def get_shortcode_from_facialembeddings_id(fe_id):
+    """
+    Returns a shortcode given from the
+    facial embedding id
+    """
     return FacialEmbeddings.get(id=fe_id).op.shortcode
 
 
