@@ -274,8 +274,12 @@ def mp_instagram_hashtag_feed_to_queue(args):
 
         # Create a selfie post
         # attach all latent space to this foreign key
-        s = SelfiePost(shortcode=shortcode, img_url=display_url)
-        s.save()
+        s, created = SelfiePost.get_or_create(shortcode=shortcode, img_url=display_url)
+
+        # Break if already created
+        if not created:
+            print("[{}] Already indexed: {} <{}>".format(time.ctime(), shortcode, tag))
+            return
 
         for np_feature in np_features:
             # Convert to string and store in db
@@ -322,7 +326,12 @@ if __name__ == '__main__':
         pass
 
     # What kind of tags do we want to scrap
-    tags_to_be_scraped = ['selfie', 'selfportait', 'dailylook', 'selfiesunday']
+    tags_to_be_scraped = [
+        'selfie', 'selfportait', 'dailylook', 'selfiesunday',
+        'selfietime', 'instaselfie', 'shamelessselefie',
+        'faceoftheday' 'me', 'selfieoftheday', 'instame'
+        'selfiestick', 'selfies'
+    ]
     tags_to_be_scraped_dict = {
         k: instagram_hashtag_seed(k) for k in tags_to_be_scraped
     }
