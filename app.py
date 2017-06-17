@@ -119,7 +119,7 @@ async def iffse_search(request):
 
         # If it hasn't been indexed before, then
         # add the latent embeddings into it
-        if not created:
+        if created:
             for np_feature in np_features:
                 # Convert to string and store in db
                 np_str = np_to_string(np_feature)
