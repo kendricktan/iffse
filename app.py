@@ -12,8 +12,8 @@ from sanic import Sanic, response
 from annoy import AnnoyIndex
 from config import CONFIG
 
+from iffse.database import FacialEmbeddings, SelfiePost
 from iffse.utils.helpers import string_to_np, np_to_string
-from iffse.data.database import FacialEmbeddings, SelfiePost
 from scrapper import (
     get_instagram_shared_data,
     img_url_to_latent_space,
