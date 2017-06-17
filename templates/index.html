@@ -11,6 +11,94 @@
     <script src="//ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
 
     <style>
+        /* Spinner Slices */
+
+        .cssload-container {
+            position: relative;
+        }
+
+        .cssload-whirlpool,
+        .cssload-whirlpool::before,
+        .cssload-whirlpool::after {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            border: 1px solid rgb(204, 204, 204);
+            border-left-color: rgb(0, 0, 0);
+            border-radius: 974px;
+            -o-border-radius: 974px;
+            -ms-border-radius: 974px;
+            -webkit-border-radius: 974px;
+            -moz-border-radius: 974px;
+        }
+
+        .cssload-whirlpool {
+            margin: -24px 0 0 -24px;
+            height: 49px;
+            width: 49px;
+            animation: cssload-rotate 1150ms linear infinite;
+            -o-animation: cssload-rotate 1150ms linear infinite;
+            -ms-animation: cssload-rotate 1150ms linear infinite;
+            -webkit-animation: cssload-rotate 1150ms linear infinite;
+            -moz-animation: cssload-rotate 1150ms linear infinite;
+        }
+
+        .cssload-whirlpool::before {
+            content: "";
+            margin: -22px 0 0 -22px;
+            height: 43px;
+            width: 43px;
+            animation: cssload-rotate 1150ms linear infinite;
+            -o-animation: cssload-rotate 1150ms linear infinite;
+            -ms-animation: cssload-rotate 1150ms linear infinite;
+            -webkit-animation: cssload-rotate 1150ms linear infinite;
+            -moz-animation: cssload-rotate 1150ms linear infinite;
+        }
+
+        .cssload-whirlpool::after {
+            content: "";
+            margin: -28px 0 0 -28px;
+            height: 55px;
+            width: 55px;
+            animation: cssload-rotate 2300ms linear infinite;
+            -o-animation: cssload-rotate 2300ms linear infinite;
+            -ms-animation: cssload-rotate 2300ms linear infinite;
+            -webkit-animation: cssload-rotate 2300ms linear infinite;
+            -moz-animation: cssload-rotate 2300ms linear infinite;
+        }
+
+
+
+        @keyframes cssload-rotate {
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        @-o-keyframes cssload-rotate {
+            100% {
+                -o-transform: rotate(360deg);
+            }
+        }
+
+        @-ms-keyframes cssload-rotate {
+            100% {
+                -ms-transform: rotate(360deg);
+            }
+        }
+
+        @-webkit-keyframes cssload-rotate {
+            100% {
+                -webkit-transform: rotate(360deg);
+            }
+        }
+
+        @-moz-keyframes cssload-rotate {
+            100% {
+                -moz-transform: rotate(360deg);
+            }
+        }
+
         body {
             padding-top: 50px;
         }
@@ -59,6 +147,7 @@
             <div class="column column-80 column-offset-10">
                 <hr/>
                 <h2>Instagram Facial Feature Search Engine</h2>
+                <h4>Find Instagram look alikes</h4>
                 <span style="text-align: right">
                     <h6>
                         *only photos with tags <em>#selfie</em>, <em>#selfportrait</em>, <em>#dailylook</em>, <em>#selfiesunday</em> are indexed*<br/>
@@ -74,8 +163,9 @@
             <div class="column column-80 column-offset-10">
                 <h2>Search</h2>
                 <button class="button-black button-outline" onclick="searchInstaPost()" style="float: right">find similar faces</button>
+                <label style="float: left; padding-top: 5px;">instagram.com/p/ &nbsp;</label>
                 <div style="overflow: hidden; padding-right: .5em;">
-                    <input type="text" style="width: 100%;" placeholder="instagram.com/p/BVbcg5jFPSv/" id="instaPostField"/>
+                    <input type="text" style="width: 100%;" placeholder="BVcbZX1nuz8" id="instaPostField" value="BVcbZX1nuz8"/>                    
                 </div>
             </div>
         </div>
@@ -86,7 +176,7 @@
         <!-- Image submitted / similar faces -->
         <div class="row">
             <div class="column column-80 column-offset-10">
-                <div id="selectFoundFaceDiv">                                    
+                <div id="selectFoundFaceDiv">
                 </div>
 
                 <br/>
@@ -97,7 +187,9 @@
 
                 <br/>
 
-                <h3>Results</h3>
+                <h3 id="resultsH3"></h3>
+                <div style="padding-top: 20px;" class="cssload-container" id="cssloader">                    
+                </div>
 
                 <div align="center" id="iffseResults">
                 </div>
@@ -118,11 +210,11 @@
     <script async="" defer="defer" src="//platform.instagram.com/en_US/embeds.js"></script>
 
     <script>
-        function displayNewFace(selectObj){
+        function displayNewFace(selectObj) {
             // Set image source
             var img_ = document.getElementById('selectedFaceImg');
             img_.src = "data:image/png;base64," + global_data[selectObj.value]['face']
-            
+
             // Set Results
             var resultsDiv = document.getElementById('iffseResults');
             resultsDiv.innerHTML = '';
@@ -130,29 +222,33 @@
         }
 
         // Create new dropdown menu
-        function newFacesDropDown(data){
+        function newFacesDropDown(data) {
             // Our new dropdown thingo
             // Create new option for our dropdown select thingo
-            var selectNode = document.createElement('select');                 
-            for (var i in data){
+            var selectNode = document.createElement('select');
+            for (var i in data) {
                 var op = new Option();
-                op.value = i;                
+                op.value = i;
                 op.text = 'Person: ' + (parseInt(i) + 1);
                 selectNode.options.add(op)
             }
             selectNode.setAttribute('onchange', 'displayNewFace(this)');
             selectNode.id = 'faceDropDown';
-            
+
             // h3 to display results
             var labelNode = document.createElement('h3')
-            labelNode.innerText = Object.keys(data).length + " faces found, displaying results for:"        
+            labelNode.innerText = Object.keys(data).length + " face(s) found, displaying results for:"
 
             // Get our display div and yeah...
             // Clear it and append new stuff
-            var selectFoundFaceDiv = document.getElementById('selectFoundFaceDiv');            
+            var selectFoundFaceDiv = document.getElementById('selectFoundFaceDiv');
             selectFoundFaceDiv.innerHTML = '';
             selectFoundFaceDiv.appendChild(labelNode);
             selectFoundFaceDiv.appendChild(selectNode);
+
+            // Clear spinner
+            var spinner_ = document.getElementById('cssloader')
+            spinner_.innerHTML = '';
 
             // Programatically set the 1st index
             var select_ = document.getElementById('faceDropDown');
@@ -161,8 +257,25 @@
         }
 
         // Search button on click
-        function searchInstaPost() {
+        function searchInstaPost() {            
+            // Clear everything out
+            var resultsDiv = document.getElementById('iffseResults');
+            resultsDiv.innerHTML = '';
+
+            var selectFoundFaceDiv = document.getElementById('selectFoundFaceDiv');
+            selectFoundFaceDiv.innerHTML = '';
+
+            var img_ = document.getElementById('selectedFaceImg');
+            img_.src = '';
+
+            // Sets results and give spinner
+            var results_ = document.getElementById('resultsH3');
+            results_.innerHTML = 'Results';
+
             var url = document.getElementById('instaPostField').value;
+            var spinner_ = document.getElementById('cssloader')
+            spinner_.innerHTML = '<div class="cssload-whirlpool"></div>';            
+
             $.ajax({
                 type: 'POST',
                 url: '/search',
@@ -171,16 +284,23 @@
                 data: JSON.stringify({
                     'url': url,
                 }),
-                success: function (data) {    
+                success: function (data) {
                     // Using globals because i'm a pleb                
                     global_data = data['data']
-                    newFacesDropDown(data['data']);                    
+                    newFacesDropDown(data['data']);
+                },
+                error: function (data){
+                    selectFoundFaceDiv.innerHTML = "<h3>Hmm, can't seem to locate a face.</h3>"
+                    resultsDiv.innerHTML = '<h3>Nothing found :-(</h3>'               
+                    spinner_.innerHTML = '';
+                    img_.src = '/sadbaby';
                 }
             });
         }
 
         // Loads instagram post in order of the
-        // provided shortcodes
+        // provided shortcodes. If it failed its
+        // most likely a post thats removed
         function loadInstaEmbedOrdered(shortcodes) {
             if (shortcodes.length > 0) {
                 $.ajax({

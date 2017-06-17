@@ -2,9 +2,11 @@ import base64
 import os
 import jinja2
 import requests
+import argparse
 
 from io import BytesIO
 
+from tqdm import tqdm
 from sanic import Sanic, response
 
 from annoy import AnnoyIndex
@@ -21,6 +23,7 @@ from scrapper import (
 # Global vars
 app = Sanic(__name__)
 app.static('/favicon.ico', './static/favicon.ico')
+app.static('/sadbaby', './static/sadbaby.jpg')
 
 annoy_settings = CONFIG['annoy_tree_settings']
 annoy_tree = AnnoyIndex(128, metric=annoy_settings['metric'])
@@ -31,9 +34,11 @@ annoy_tree = AnnoyIndex(128, metric=annoy_settings['metric'])
 def get_shortcode_from_facialembeddings_id(fe_id):
     """
     Returns a shortcode given from the
-    facial embedding id
+    facial embedding index from annoy tree
+    Indexes start from 0, ids from db start from 1,
+    hence + 1
     """
-    return FacialEmbeddings.get(id=fe_id).op.shortcode
+    return FacialEmbeddings.get(id=(fe_id + 1)).op.shortcode
 
 
 def get_unique_shortcodes_from_fe_ids(fe):
@@ -49,7 +54,7 @@ def get_unique_shortcodes_from_fe_ids(fe):
     idxs = annoy_tree.get_nns_by_vector(fe, 20)
 
     shortcodes_unique = []
-    for i in idxs[1:]:
+    for i in idxs:
         s_ = get_shortcode_from_facialembeddings_id(i)
         if s_ not in shortcodes_unique:
             shortcodes_unique.append(s_)
@@ -89,37 +94,38 @@ async def iffse_search(request):
     try:
         url = request.json.get('url', None)
 
+        if url is None:
+            return response.json({'url': 'need to specify instagram url'}, status=400)
+
         # Get instagram json data
         # (in order to get img url and stuff)
+        url = 'https://www.instagram.com/p/{}/'.format(url)
+
         r = requests.get(url)
         r_js = get_instagram_shared_data(r.text)
 
         # Get display url and shortcode
         media_json = r_js['entry_data']['PostPage'][0]['graphql']['shortcode_media']
         display_src = media_json['display_url']
-        # shortcode = media_json['shortcode']
+        shortcode = media_json['shortcode']
 
         # Pass image into the NN and
         # get the 128 dim embeddings
         np_features, img, bb = img_url_to_latent_space(display_src)
 
-        # Shit crashes, maybe add to annoy later
-        # # See if post has been indexed before
-        # s, created = SelfiePost.get_or_create(
-        #     shortcode=shortcode, img_url=display_src)
+        # See if post has been indexed before
+        s, created = SelfiePost.get_or_create(
+            shortcode=shortcode, img_url=display_src)
 
-        # # If it hasn't been indexed before, then
-        # # add the latent embeddings into it
-        # if not created:
-        #     for np_feature in np_features:
-        #         # Convert to string and store in db
-        #         np_str = np_to_string(np_feature)
+        # If it hasn't been indexed before, then
+        # add the latent embeddings into it
+        if not created:
+            for np_feature in np_features:
+                # Convert to string and store in db
+                np_str = np_to_string(np_feature)
 
-        #         fe = FacialEmbeddings(op=s, latent_space=np_str)
-        #         fe.save()
-
-        #         # Add feature to annoy tree to be indexed
-        #         annoy_tree.add_item(fe.id, np_feature)
+                fe = FacialEmbeddings(op=s, latent_space=np_str)
+                fe.save()
 
         # Now we can query it
         # For each face too
@@ -146,10 +152,32 @@ async def iffse_search(request):
     except Exception as e:
         print(e)
         return response.json(
-            {'error': 'something fucked up lol'}
+            {'error': 'something fucked up lol'},
+            status=400
         )
 
 
 if __name__ == '__main__':
-    annoy_tree.load(CONFIG['annoy_tree'])
+    parser = argparse.ArgumentParser(description='IFFSE')
+    parser.add_argument('--rebuild-tree', action='store_true')
+    args, unknown = parser.parse_known_args()
+
+    # If specified to rebuild tree then rebuild it
+    if args.rebuild_tree:
+        print('Rebuidling tree...')
+        for idx, f in enumerate(tqdm(FacialEmbeddings.select())):
+            try:
+                cur_np = string_to_np(f.latent_space)
+                annoy_tree.add_item(idx, cur_np)
+
+            except Exception as e:
+                tqdm.write(str(e))
+
+        annoy_tree.build(annoy_settings['forest_trees_no'])
+        annoy_tree.save(CONFIG['annoy_tree'])
+
+    # Else just load config
+    else:
+        annoy_tree.load(CONFIG['annoy_tree'])
+
     app.run(host='127.0.0.1', port=8000, debug=False)
