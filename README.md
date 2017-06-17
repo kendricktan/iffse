@@ -13,10 +13,15 @@ source ~/.bashrc # or `source ~/.zshrc` if you're using zsh
 # Create new conda env and use it
 conda create -n facemaps python=3.6 anaconda
 source activate facemaps
+
+# Annoy Issue:
+# Annoy uses libstdc++, Anaconda provides its own libstdc++,
+# to use annoy in Anaconda, run:
+cp /usr/lib/x86_64-linux-gnu/libstdc++.so.6 $CONDA_PATH/envs/facemaps/lib 
 ```
 
 ### Dependencies:
-```
+```bash
 conda install -c menpo dlib=19.4
 conda install pytorch torchvision -c soumith
 pip install -r requirements.txt

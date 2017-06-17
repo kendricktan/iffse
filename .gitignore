@@ -4,7 +4,9 @@ __pycache__/
 *$py.class
 *.db
 *.log
+*.hdf5
 .vscode/
+data/
 
 # C extensions
 *.so

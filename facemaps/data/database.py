@@ -7,7 +7,7 @@ from peewee import (
     Model
 )
 
-db = SqliteDatabase('selfiers.db')
+db = SqliteDatabase('./data/selfiers.db')
 
 
 class SelfiePost(Model):

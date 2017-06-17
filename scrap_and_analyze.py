@@ -298,7 +298,7 @@ if __name__ == '__main__':
     sds, qid, ec, itn = instagram_hashtag_seed()
 
     while True:
-        # success, shortcodes, display src, latent value
+        # Async map through all given shortcodes
         p.map_async(mp_instagram_hashtag_feed_to_queue, sds)
 
         # Get next batch
