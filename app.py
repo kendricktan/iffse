@@ -24,6 +24,7 @@ from scrapper import (
 app = Sanic(__name__)
 app.static('/favicon.ico', './static/favicon.ico')
 app.static('/sadbaby', './static/sadbaby.jpg')
+app.static('/man', './static/man.png')
 
 annoy_settings = CONFIG['annoy_tree_settings']
 annoy_tree = AnnoyIndex(128, metric=annoy_settings['metric'])
@@ -114,8 +115,13 @@ async def iffse_search(request):
         np_features, img, bb = img_url_to_latent_space(display_src)
 
         # See if post has been indexed before
-        s, created = SelfiePost.get_or_create(
-            shortcode=shortcode, img_url=display_src)
+        # Fails on post that has multiple images
+        # hacky fix
+        try:
+            s, created = SelfiePost.get_or_create(
+                shortcode=shortcode, img_url=display_src)
+        except:
+            created = False
 
         # If it hasn't been indexed before, then
         # add the latent embeddings into it
