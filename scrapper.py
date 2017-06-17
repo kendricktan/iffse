@@ -27,7 +27,7 @@ from peewee import OperationalError
 
 from torch.autograd import Variable
 
-from iffse.data.database import db, SelfiePost, FacialEmbeddings
+from iffse.database import db, SelfiePost, FacialEmbeddings
 from iffse.utils.helpers import string_to_np, np_to_string
 from iffse.utils.ml.open_face import load_openface_net
 from iffse.utils.cv.faces import (
