@@ -47,7 +47,7 @@ HEADERS = {
 
 # Network to get embeddings
 pyopenface = load_openface_net(
-    './pretrained_weights/openface.pth', cuda=False).eval()
+    './pretrained_weights/openface.pth', cuda=False)
 
 # Dlib to preprocess images
 detector = dlib.get_frontal_face_detector()
