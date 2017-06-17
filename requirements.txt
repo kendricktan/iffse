@@ -1,2 +1,4 @@
-Pillow
-requests
+opencv-python==3.2.0.7
+peewee==2.10.1
+Pillow==4.1.1
+requests==2.14.2
