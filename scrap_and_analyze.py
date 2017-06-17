@@ -267,7 +267,7 @@ def maybe_get_next_instagram_hashtag_feed(qid, ec, tag):
         time.sleep(random.randint(30, 60))
 
         # Get new query id
-        _, new_qid, _, _ = instagram_hashtag_seed()
+        _, new_qid, _ = instagram_hashtag_seed()
 
         # Calls itself infinitely until it returns
         # # untested
