@@ -189,12 +189,12 @@
         <div class="row">
             <div class="column column-40 column-offset-10">
                 <div id="selectedFace" style="text-align: center;">
-                    <img id="selectedFaceImg" width=128 height=128/>                    
+                    <img id="selectedFaceImg" width=128 height=128/>
                 </div>
             </div>
             <div class="column column-40">
                 <div id="selectedFacialLandmark" style="text-align: center;">
-                    <img id="selectedFacialLandmarkImg" width=128 height=128/>                    
+                    <img id="selectedFacialLandmarkImg" width=128 height=128/>
                 </div>
             </div>
         </div>
@@ -233,22 +233,22 @@
             img_div.innerHTML = '';
 
             var img_fl_div = document.getElementById('selectedFacialLandmark');
-            img_fl_div.innerHTML = ''; 
+            img_fl_div.innerHTML = '';
 
             // Set image source
             var img_ = new Image();
-            var img_div =document.getElementById('selectedFace');
-            
-            img_.onload = function(){
+            var img_div = document.getElementById('selectedFace');
+
+            img_.onload = function () {
                 img_div.appendChild(img_);
             }
             img_.src = "data:image/png;base64," + global_data[selectObj.value]['face']
 
-            
-            var img_fl = new Image();
-            var img_fl_div =document.getElementById('selectedFacialLandmark');
 
-            img_fl.onload = function(){
+            var img_fl = new Image();
+            var img_fl_div = document.getElementById('selectedFacialLandmark');
+
+            img_fl.onload = function () {
                 img_fl_div.appendChild(img_fl);
             }
 
@@ -294,7 +294,7 @@
             img_div.innerHTML = '';
 
             var img_fl_div = document.getElementById('selectedFacialLandmark');
-            img_fl_div.innerHTML = '';   
+            img_fl_div.innerHTML = '';
 
             // Programatically set the 1st index
             var select_ = document.getElementById('faceDropDown');
@@ -315,7 +315,7 @@
             img_div.innerHTML = '';
 
             var img_fl_div = document.getElementById('selectedFacialLandmark');
-            img_fl_div.innerHTML = '';            
+            img_fl_div.innerHTML = '';
 
             // Sets results and give spinner
             var results_ = document.getElementById('resultsH3');
@@ -342,14 +342,14 @@
                     selectFoundFaceDiv.innerHTML = "<h3>Hmm, can't seem to locate a face.</h3>"
                     resultsDiv.innerHTML = '<h3>Nothing found :-(</h3>'
                     spinner_.innerHTML = '';
-                    
+
                     // Set image source
                     var img_ = new Image();
-                    var img_div =document.getElementById('selectedFace');
-                    
-                    img_.onload = function(){
+                    var img_div = document.getElementById('selectedFace');
+
+                    img_.onload = function () {
                         img_div.appendChild(img_);
-                    }                    
+                    }
                     img_.src = '/sadbaby';
                 }
             });
@@ -366,7 +366,7 @@
                     dataType: 'jsonp',
                     success: function (data) {
                         var resultsDiv = document.getElementById('iffseResults');
-                        resultsDiv.innerHTML += data['html'];                        
+                        resultsDiv.innerHTML += data['html'];
                     },
                 }).done(function () {
                     loadInstaEmbedOrdered(shortcodes.slice(1));
@@ -374,10 +374,23 @@
                     loadInstaEmbedOrdered(shortcodes.slice(1));
                 });
             }
-            else{
+            else {
                 window.instgrm.Embeds.process();
             }
         }
+    </script>
+
+    <script>
+        (function (i, s, o, g, r, a, m) {
+        i['GoogleAnalyticsObject'] = r; i[r] = i[r] || function () {
+            (i[r].q = i[r].q || []).push(arguments)
+        }, i[r].l = 1 * new Date(); a = s.createElement(o),
+            m = s.getElementsByTagName(o)[0]; a.async = 1; a.src = g; m.parentNode.insertBefore(a, m)
+        })(window, document, 'script', 'https://www.google-analytics.com/analytics.js', 'ga');
+
+        ga('create', 'UA-71060764-8', 'auto');
+        ga('send', 'pageview');
+
     </script>
 </body>
 
