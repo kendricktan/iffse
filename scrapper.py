@@ -310,8 +310,8 @@ def maybe_get_next_instagram_hashtag_feed(qid, ec, tag):
         print('[{}] !!!!!!!!'.format(time.ctime()))
         print('!!!! Error: {} !!!!'.format(e))
         print('!!!! Instagram probably rate limited us... whoops !!!!')
-        print('!!!! Pausing for ~15 seconds !!!!')
-        time.sleep(random.randint(10, 15))
+        print('!!!! Pausing for ~1.5 minute!!!!')
+        time.sleep(random.randint(60, 90))
 
         # Get new query id
         # Swap out lines below if you
