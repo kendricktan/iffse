@@ -228,6 +228,13 @@
 
     <script>
         function displayNewFace(selectObj) {
+            // Clear faces
+            var img_div = document.getElementById('selectedFace');
+            img_div.innerHTML = '';
+
+            var img_fl_div = document.getElementById('selectedFacialLandmark');
+            img_fl_div.innerHTML = ''; 
+
             // Set image source
             var img_ = new Image();
             var img_div =document.getElementById('selectedFace');
