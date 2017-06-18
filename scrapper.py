@@ -222,7 +222,7 @@ def img_url_to_latent_space(display_url):
     bb = maybe_face_bounding_box(detector, img)
 
     if bb is None:
-        return None, None, None
+        return None, None, None, None
 
     # Iterate through each possible bounding box
     # And chuck in their respective facial landmarks
@@ -365,8 +365,6 @@ if __name__ == '__main__':
             # Get next batch
             sds, qid, ec = maybe_get_next_instagram_hashtag_feed(qid, ec, tag)
             tags_to_be_scraped_dict[tag] = (sds, qid, ec)
-
-        time.sleep(random.random())
 
     # Wait for pool to close
     p.close()
