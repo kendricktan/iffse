@@ -342,6 +342,14 @@
                     selectFoundFaceDiv.innerHTML = "<h3>Hmm, can't seem to locate a face.</h3>"
                     resultsDiv.innerHTML = '<h3>Nothing found :-(</h3>'
                     spinner_.innerHTML = '';
+                    
+                    // Set image source
+                    var img_ = new Image();
+                    var img_div =document.getElementById('selectedFace');
+                    
+                    img_.onload = function(){
+                        img_div.appendChild(img_);
+                    }                    
                     img_.src = '/sadbaby';
                 }
             });
