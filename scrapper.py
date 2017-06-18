@@ -225,10 +225,13 @@ def img_url_to_latent_space(display_url):
         return None, None, None
 
     # Iterate through each possible bounding box
+    # And chuck in their respective facial landmarks
+    facial_landmarks = []
     img_tensor = None
     for idx, b in enumerate(bb):
         # Get 68 landmarks
         points = get_68_facial_landmarks(predictor, img, b)
+        facial_landmarks.append(points)
 
         # Realign image and resize
         # to 96 x 96 (network input)
@@ -249,7 +252,7 @@ def img_url_to_latent_space(display_url):
     # get NUM_FACES x 128 latent space
     np_features = pyopenface(Variable(img_tensor))[0].data.numpy()
 
-    return np_features, img_pil, bb
+    return np_features, img_pil, bb, facial_landmarks
 
 
 def mp_instagram_hashtag_feed_to_queue(args):
@@ -265,7 +268,7 @@ def mp_instagram_hashtag_feed_to_queue(args):
 
     try:
         # Facial recognition logic here:
-        np_features, _, _ = img_url_to_latent_space(display_url)
+        np_features, _, _, _ = img_url_to_latent_space(display_url)
 
         if np_features is None:
             print("[{}] No faces: {} <{}>".format(

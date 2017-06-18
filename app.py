@@ -5,6 +5,7 @@ import requests
 import argparse
 
 from io import BytesIO
+from PIL import ImageDraw
 
 from tqdm import tqdm
 from sanic import Sanic, response
@@ -17,7 +18,7 @@ from iffse.utils.helpers import string_to_np, np_to_string
 from scrapper import (
     get_instagram_shared_data,
     img_url_to_latent_space,
-    img_url_to_pillow
+    img_url_to_pillow,
 )
 
 # Global vars
@@ -112,7 +113,11 @@ async def iffse_search(request):
 
         # Pass image into the NN and
         # get the 128 dim embeddings
-        np_features, img, bb = img_url_to_latent_space(display_src)
+        # np_features: 128 dim embedding
+        # img: origin image
+        # bb: N x 4, bounding box for each face
+        # fls: N x 68, facial landmarks for each face
+        np_features, img, bb, fls = img_url_to_latent_space(display_src)
 
         # See if post has been indexed before
         # Fails on post that has multiple images
@@ -133,21 +138,35 @@ async def iffse_search(request):
                 fe = FacialEmbeddings(op=s, latent_space=np_str)
                 fe.save()
 
+        # This copy of the image is to
+        # display the facial landmarks
+        img_landmarks = img.copy()
+        draw_img = ImageDraw.Draw(img_landmarks)
+        for fl in fls:
+            for (x, y) in fl:
+                draw_img.ellipse((x - 3, y - 3, x + 3, y + 3), fill='red', outline='red')
+
         # Now we can query it
         # For each face too
         shortcodes = {}
         for idx, feature in enumerate(np_features):
             b = bb[idx]
+            fl = fls[idx]
 
             # Crop to specific face
             lrtp = (b.left(), b.top(), b.right(), b.bottom())
             img_cropped = img.crop(lrtp)
-            img_base64 = pillow_to_base64(img_cropped)
+            img_cropped_base64 = pillow_to_base64(img_cropped)
+
+            # Draw facial landmarks
+            img_landmarks_cropped = img_landmarks.crop(lrtp)
+            img_landmarks_base64 = pillow_to_base64(img_landmarks_cropped)
 
             # Get unique shortcode based on the features provided
             shortcodes_unique = get_unique_shortcodes_from_fe_ids(feature)
             shortcodes[idx] = {
-                'face': img_base64,
+                'face': img_cropped_base64,
+                'face_landmarks': img_landmarks_base64,
                 'shortcodes': shortcodes_unique
             }
 

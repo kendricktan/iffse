@@ -110,10 +110,11 @@
             /* ie8 */
         }
 
-        footer {            
+
+        footer {
             background: white;
             padding-top: 30px;
-            width: 100%;          
+            width: 100%;
             bottom: 0;
             position: fixed;
             font-size: 14px;
@@ -146,7 +147,7 @@
         <div class="row">
             <div class="column column-80 column-offset-10">
                 <hr/>
-                <p><img src="/man" style="float: right; height: 5em"/></p>
+                <p><img src="/man" style="float: right; height: 5em" /></p>
                 <h2>Instagram Facial Feature Search Engine</h2>
                 <h4>Find Instagram look alikes</h4>
                 <span style="text-align: right">
@@ -166,7 +167,7 @@
                 <button class="button-black button-outline" onclick="searchInstaPost()" style="float: right">find similar faces</button>
                 <label style="float: left; padding-top: 5px;">instagram.com/p/ &nbsp;</label>
                 <div style="overflow: hidden; padding-right: .5em;">
-                    <input type="text" style="width: 100%;" placeholder="BVcbZX1nuz8" id="instaPostField" value="BVcbZX1nuz8"/>                    
+                    <input type="text" style="width: 100%;" placeholder="BVcbZX1nuz8" id="instaPostField" value="BVcbZX1nuz8" />
                 </div>
                 <hr/>
             </div>
@@ -175,22 +176,36 @@
         <br/>
         <br/>
 
-        <!-- Image submitted / similar faces -->
+        <!-- No. Faces found dropdown -->
         <div class="row">
             <div class="column column-80 column-offset-10">
                 <div id="selectFoundFaceDiv">
                 </div>
+            </div>
+        </div>
+        <br/>
 
-                <br/>
-
-                <div style="text-align: center">
-                    <img width=200px id="selectedFaceImg" />
+        <!-- Selected faces display -->
+        <div class="row">
+            <div class="column column-40 column-offset-10">
+                <div id="selectedFace" style="text-align: center;">
+                    <img id="selectedFaceImg" width=128 height=128/>                    
                 </div>
+            </div>
+            <div class="column column-40">
+                <div id="selectedFacialLandmark" style="text-align: center;">
+                    <img id="selectedFacialLandmarkImg" width=128 height=128/>                    
+                </div>
+            </div>
+        </div>
 
-                <br/>
+        <br/>
 
+        <!-- Results -->
+        <div class="row">
+            <div class="column column-80 column-offset-10">
                 <h3 id="resultsH3"></h3>
-                <div style="padding-top: 20px;" class="cssload-container" id="cssloader">                    
+                <div style="padding-top: 20px;" class="cssload-container" id="cssloader">
                 </div>
 
                 <div align="center" id="iffseResults">
@@ -214,8 +229,23 @@
     <script>
         function displayNewFace(selectObj) {
             // Set image source
-            var img_ = document.getElementById('selectedFaceImg');
+            var img_ = new Image();
+            var img_div =document.getElementById('selectedFace');
+            
+            img_.onload = function(){
+                img_div.appendChild(img_);
+            }
             img_.src = "data:image/png;base64," + global_data[selectObj.value]['face']
+
+            
+            var img_fl = new Image();
+            var img_fl_div =document.getElementById('selectedFacialLandmark');
+
+            img_fl.onload = function(){
+                img_fl_div.appendChild(img_fl);
+            }
+
+            img_fl.src = "data:image/png;base64," + global_data[selectObj.value]['face_landmarks']
 
             // Set Results
             var resultsDiv = document.getElementById('iffseResults');
@@ -259,7 +289,7 @@
         }
 
         // Search button on click
-        function searchInstaPost() {            
+        function searchInstaPost() {
             // Clear everything out
             var resultsDiv = document.getElementById('iffseResults');
             resultsDiv.innerHTML = '';
@@ -267,8 +297,11 @@
             var selectFoundFaceDiv = document.getElementById('selectFoundFaceDiv');
             selectFoundFaceDiv.innerHTML = '';
 
-            var img_ = document.getElementById('selectedFaceImg');
-            img_.src = '';
+            var img_div = document.getElementById('selectedFace');
+            img_div.innerHTML = '';
+
+            var img_fl_div = document.getElementById('selectedFacialLandmark');
+            img_fl_div.innerHTML = '';            
 
             // Sets results and give spinner
             var results_ = document.getElementById('resultsH3');
@@ -276,7 +309,7 @@
 
             var url = document.getElementById('instaPostField').value;
             var spinner_ = document.getElementById('cssloader')
-            spinner_.innerHTML = '<div class="cssload-whirlpool"></div>';            
+            spinner_.innerHTML = '<div class="cssload-whirlpool"></div>';
 
             $.ajax({
                 type: 'POST',
@@ -291,9 +324,9 @@
                     global_data = data['data']
                     newFacesDropDown(data['data']);
                 },
-                error: function (data){
+                error: function (data) {
                     selectFoundFaceDiv.innerHTML = "<h3>Hmm, can't seem to locate a face.</h3>"
-                    resultsDiv.innerHTML = '<h3>Nothing found :-(</h3>'               
+                    resultsDiv.innerHTML = '<h3>Nothing found :-(</h3>'
                     spinner_.innerHTML = '';
                     img_.src = '/sadbaby';
                 }
