@@ -307,11 +307,18 @@ def maybe_get_next_instagram_hashtag_feed(qid, ec, tag):
     except Exception as e:
         print('!!!! Error: {} !!!!'.format(e))
         print('!!!! Instagram probably rate limited us... whoops !!!!')
-        print('!!!! Pausing for ~1 minute !!!!')
-        time.sleep(random.randint(30, 60))
+        print('!!!! Pausing for ~15 seconds !!!!')
+        time.sleep(random.randint(10, 15))
 
         # Get new query id
-        _, new_qid, _ = instagram_hashtag_seed()
+        # Swap out lines below if you
+        # want to scrap new posts instead
+        # of trying to go back to the beginning
+        # of time on instagram (no possible)
+        # as the ec (endcursor) gives different
+        # results after a set time interval
+        _, new_qid, ec = instagram_hashtag_seed()
+        # _, new_qid, _ = instagram_hashtag_seed()
 
         # Calls itself infinitely until it returns
         # # untested
