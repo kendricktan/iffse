@@ -8,7 +8,6 @@ import json
 import re
 import requests
 import random
-import h5py
 
 import sys
 import dlib

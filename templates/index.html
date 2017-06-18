@@ -282,6 +282,13 @@
             var spinner_ = document.getElementById('cssloader')
             spinner_.innerHTML = '';
 
+            // Clear faces
+            var img_div = document.getElementById('selectedFace');
+            img_div.innerHTML = '';
+
+            var img_fl_div = document.getElementById('selectedFacialLandmark');
+            img_fl_div.innerHTML = '';   
+
             // Programatically set the 1st index
             var select_ = document.getElementById('faceDropDown');
             select_.value = 0;

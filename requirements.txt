@@ -1,3 +1,4 @@
+annoy==1.8.3
 Jinja2==2.9.4
 opencv-python==3.2.0.7
 peewee==2.10.1
@@ -5,3 +6,5 @@ Pillow==4.1.1
 requests==2.14.2
 sanic==0.5.4
 Sanic-Cors==0.5.4.2
+scikit-image==0.13.0
+tqdm==4.14.0
