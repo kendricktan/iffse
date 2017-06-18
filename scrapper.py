@@ -282,7 +282,7 @@ def mp_instagram_hashtag_feed_to_queue(args):
 
         # Break if already created
         if not created:
-            print("[{}] Already indexed: {} <{}>".format(
+            print("[{}] !! Already indexed: {} <{}>".format(
                 time.ctime(), shortcode, tag))
             return
 
@@ -307,6 +307,7 @@ def maybe_get_next_instagram_hashtag_feed(qid, ec, tag):
         sds, ec = get_instagram_hashtag_feed(qid, ec, tag)
 
     except Exception as e:
+        print('[{}] !!!!!!!!'.format(time.ctime()))
         print('!!!! Error: {} !!!!'.format(e))
         print('!!!! Instagram probably rate limited us... whoops !!!!')
         print('!!!! Pausing for ~15 seconds !!!!')
