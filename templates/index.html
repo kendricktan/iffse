@@ -344,14 +344,16 @@
                     dataType: 'jsonp',
                     success: function (data) {
                         var resultsDiv = document.getElementById('iffseResults');
-                        resultsDiv.innerHTML += data['html'];
-                        window.instgrm.Embeds.process()
+                        resultsDiv.innerHTML += data['html'];                        
                     },
                 }).done(function () {
                     loadInstaEmbedOrdered(shortcodes.slice(1));
                 }).fail(function () {
                     loadInstaEmbedOrdered(shortcodes.slice(1));
                 });
+            }
+            else{
+                window.instgrm.Embeds.process();
             }
         }
     </script>

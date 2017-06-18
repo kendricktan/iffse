@@ -1,3 +1,5 @@
+import os
+
 from peewee import (
     CharField,
     TextField,
@@ -6,6 +8,9 @@ from peewee import (
     ForeignKeyField,
     Model
 )
+
+if not os.path.exists('./data'):
+    os.makedirs('./data')
 
 db = SqliteDatabase('./data/selfiers.db')
 
