@@ -24,7 +24,7 @@ cp /usr/lib/x86_64-linux-gnu/libstdc++.so.6 $CONDA_PATH/envs/facemaps/lib
 
 ### Dependencies:
 ```bash
-conda install -c menpo dlib=19.4
+conda install -c conda-forge dlib=19.4
 conda install pytorch torchvision -c soumith
 pip install -r requirements.txt
 ```
