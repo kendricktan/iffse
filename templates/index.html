@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="//fonts.googleapis.com/css?family=Roboto:300,300italic,700,700italic">
     <link rel="stylesheet" href="//cdn.rawgit.com/milligram/milligram/master/dist/milligram.min.css">
     <link rel="stylesheet" href="//cdn.rawgit.com/necolas/normalize.css/master/normalize.css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/clipboard.js/1.7.1/clipboard.min.js"></script>
 
     <script src="//ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
 
@@ -163,12 +164,18 @@
         <!-- Input field -->
         <div class="row">
             <div class="column column-80 column-offset-10">
-                <h2>Search</h2>
+                <h2>Search</h2>                
                 <button class="button-black button-outline" onclick="searchInstaPost()" style="float: right">find similar faces</button>
                 <label style="float: left; padding-top: 5px;">instagram.com/p/ &nbsp;</label>
                 <div style="overflow: hidden; padding-right: .5em;">
-                    <input type="text" style="width: 100%;" placeholder="BVcbZX1nuz8" id="instaPostField" value="BVcbZX1nuz8" />
+                    <input oninput="updateShareableLink()" type="text" style="width: 100%;" placeholder="BVcbZX1nuz8" id="instaPostField" value="{{ INSTA_POS_ID }}" />
                 </div>
+                <br/>
+                <button class="btn button-black button-outline" data-clipboard-target="#shareableLinkLabel" style="float: right">copy to clipboard</button>                
+                <div style="overflow: hidden; padding-right: .5em;">
+                    <input oninput="updateShareableLink()" type="text" style="width: 100%;" id="shareableLinkLabel" value="https://iffse.kndrck.co/?p=" readonly/>                    
+                </div>
+                <br/>
                 <hr/>
             </div>
         </div>
@@ -378,19 +385,36 @@
                 window.instgrm.Embeds.process();
             }
         }
+
+        // Update shareable link
+        function updateShareableLink(){
+            var input_ = document.getElementById('instaPostField');
+            var label_ = document.getElementById('shareableLinkLabel');
+
+            label_.value = 'https://iffse.kndrck.co/?p=' + input_.value;
+        }
+
+        // Shareable link copy
+        window.onload = function (e) {
+            var instaPostVal =document.getElementById('instaPostField').value;
+            updateShareableLink();
+            if (instaPostVal != ''){
+                searchInstaPost();                
+            }
+            new Clipboard('.btn');
+        }
     </script>
 
     <script>
-        (function (i, s, o, g, r, a, m) {
-        i['GoogleAnalyticsObject'] = r; i[r] = i[r] || function () {
-            (i[r].q = i[r].q || []).push(arguments)
-        }, i[r].l = 1 * new Date(); a = s.createElement(o),
-            m = s.getElementsByTagName(o)[0]; a.async = 1; a.src = g; m.parentNode.insertBefore(a, m)
-        })(window, document, 'script', 'https://www.google-analytics.com/analytics.js', 'ga');
+            (function (i, s, o, g, r, a, m) {
+                i['GoogleAnalyticsObject'] = r; i[r] = i[r] || function () {
+                    (i[r].q = i[r].q || []).push(arguments)
+                }, i[r].l = 1 * new Date(); a = s.createElement(o),
+                    m = s.getElementsByTagName(o)[0]; a.async = 1; a.src = g; m.parentNode.insertBefore(a, m)
+            })(window, document, 'script', 'https://www.google-analytics.com/analytics.js', 'ga');
 
         ga('create', 'UA-71060764-8', 'auto');
         ga('send', 'pageview');
-
     </script>
 </body>
 

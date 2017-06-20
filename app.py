@@ -87,12 +87,13 @@ def render_jinja2(tpl_path, context):
 # Application logic
 @app.route('/')
 async def iffse_index(request):
-    html_ = render_jinja2('./templates/index.html', {'WHAT': 'niggas'})
+    insta_post = request.args.get('p', '')
+    html_ = render_jinja2('./templates/index.html', {'INSTA_POS_ID': insta_post})
     return response.html(html_)
 
 
 @app.route('/search', methods=["POST", ])
-async def iffse_search(request):
+async def iffse_search(request):    
     try:
         url = request.json.get('url', None)
 
