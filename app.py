@@ -40,7 +40,10 @@ def get_shortcode_from_facialembeddings_id(fe_id):
     Indexes start from 0, ids from db start from 1,
     hence + 1
     """
-    return FacialEmbeddings.get(id=(fe_id + 1)).op.shortcode
+    try:
+        return FacialEmbeddings.get(id=(fe_id + 1)).op.shortcode
+    except:
+        return None
 
 
 def get_unique_shortcodes_from_fe_ids(fe):
@@ -58,7 +61,7 @@ def get_unique_shortcodes_from_fe_ids(fe):
     shortcodes_unique = []
     for i in idxs:
         s_ = get_shortcode_from_facialembeddings_id(i)
-        if s_ not in shortcodes_unique:
+        if s_ not in shortcodes_unique and s_ is not None:
             shortcodes_unique.append(s_)
 
     return shortcodes_unique
