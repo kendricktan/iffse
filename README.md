@@ -1,7 +1,5 @@
 # IFFSE
-## [Instagram Facial Feature Search Engine](https://iffse.kndrck.co)
-
-![example](https://i.imgur.com/5eXYtHr.png)
+## Facial Feature Search Engine for some Photo Sharing Website
 
 # Setup
 The recommended way of installing a local copy of facemaps is to use a python 3.6 conda environment:
